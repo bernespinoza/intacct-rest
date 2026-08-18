@@ -55,18 +55,7 @@ module IntacctRest
         return send_request(method, path, body, retried: true)
       end
 
-      unless response.is_a?(Net::HTTPSuccess)
-        raise IntacctRest::ApiError.new("HTTP #{response.code} requesting #{path}",
-                                         http_status: response.code, body: response.body)
-      end
-
-      parsed = parse_json(response.body, path)
-
-      if parsed['ia::error']
-        raise IntacctRest::ApiError.new("API error requesting #{path}", http_status: response.code, body: parsed)
-      end
-
-      parsed
+      response
     end
 
     def parse_json(body, path)
