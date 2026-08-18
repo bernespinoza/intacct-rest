@@ -10,6 +10,7 @@ A small, framework-agnostic Ruby client for [Sage Intacct's REST API v1](https:/
 - **The `POST /objects/accounts-receivable/invoice-line` endpoint**, via `IntacctRest::Endpoints::CreateInvoiceLine` and `IntacctRest::Model::InvoiceLine`
 - **`IntacctRest::Model::Currency`**, a data + validation object for the currency shape shared by invoices and invoice lines (no dedicated create endpoint — Intacct manages currencies elsewhere; this is just a typed helper for building the payload)
 - **The `POST /objects/accounts-payable/vendor` endpoint**, via `IntacctRest::Vendor` (the operation) and `IntacctRest::Model::Vendor` (the data + a small declarative validation DSL), covering every vendor field plus custom fields
+- **The `POST /objects/accounts-receivable/customer` endpoint**, via `IntacctRest::Endpoints::CreateCustomer` and `IntacctRest::Model::Customer`, reusing the same `Post`/validation pattern
 
 It has no Rails, ActiveRecord, or Redis dependency — the host application supplies its own token store and error-handling hook.
 
@@ -424,6 +425,28 @@ currency.payload # => {"txnCurrency"=>"USD", "exchangeRate"=>{"date"=>"2022-12-0
 ```
 
 Assign `currency.payload` (or a raw Hash) to `Model::Invoice#currency` the same way as `term`/`customer`.
+
+## Creating a customer
+
+Same three pieces as vendors — `IntacctRest::Model::Customer` (data + validation), `IntacctRest::Post` (generic send), `IntacctRest::Endpoints::CreateCustomer` (the customer-specific use case):
+
+```ruby
+customer = IntacctRest::Model::Customer.new(
+  id:           "CUST-002",
+  name:         "Starluck",
+  tax_id:       "12-3456789",
+  credit_limit: 50_000,
+  status:       "active"
+)
+
+result = IntacctRest::Endpoints::CreateCustomer.call(customer: customer, results: %i[id key href])
+
+result.success? # => true
+customer.key    # => "32"
+customer.href   # => "/objects/accounts-receivable/customer/32"
+```
+
+`vendor` is how a customer references an associated vendor record — like every other nested object in this gem, it's a raw Hash (`{"id" => "..."}`), not a `Model::Vendor` instance; there's no code-level dependency between `Model::Customer` and `Model::Vendor`. Only `name` is required at this layer, matching the schema's own `required: [name]`.
 
 ## Errors
 

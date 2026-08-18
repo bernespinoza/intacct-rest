@@ -79,6 +79,31 @@ module IntacctRest
       base_currency: 'baseCurrency', txn_currency: 'txnCurrency', exchange_rate: 'exchangeRate'
     }.freeze
 
+    # Maps IntacctRest::Model::Customer's Ruby (snake_case) accessor names
+    # to the exact camelCase JSON field names Intacct's customer object
+    # uses. Excludes deprecated fields (electronicAddress, resaleNumber,
+    # enableOnlineACHPayment, enableOnlineCardPayment, activationDate) in
+    # favor of their replacements or because they're pure legacy no-ops —
+    # same treatment as Vendor's deprecated `accountlabel`.
+    DEFAULT_CUSTOMER_WRITABLE_ATTRIBUTES = {
+      id: 'id', name: 'name', status: 'status', customer_type: 'customerType', parent: 'parent',
+      sales_representative: 'salesRepresentative', tax_id: 'taxId',
+      default_revenue_gl_account: 'defaultRevenueGLAccount', shipping_method: 'shippingMethod',
+      credit_limit: 'creditLimit', is_on_hold: 'isOnHold', contacts: 'contacts',
+      contact_list: 'contactList', restrictions: 'restrictions',
+      customer_email_templates: 'customerEmailTemplates', discount_percent: 'discountPercent',
+      term: 'term', advance_bill_by: 'advanceBillBy', advance_bill_by_type: 'advanceBillByType',
+      customer_resale_number: 'customerResaleNumber', delivery_options: 'deliveryOptions',
+      override_price_list: 'overridePriceList', customer_message: 'customerMessage',
+      currency: 'currency', email_opt_in: 'emailOptIn', territory: 'territory',
+      is_one_time_use: 'isOneTimeUse', disable_refund: 'disableRefund', vendor: 'vendor',
+      account_group: 'accountGroup', account_label: 'accountLabel', attachment: 'attachment',
+      retainage_percentage: 'retainagePercentage', notes: 'notes', price_list: 'priceList',
+      price_schedule: 'priceSchedule', override_offset_gl_account: 'overrideOffsetGLAccount',
+      customer_restriction: 'customerRestriction', restricted_locations: 'restrictedLocations',
+      restricted_departments: 'restrictedDepartments', customer_account_health: 'customerAccountHealth'
+    }.freeze
+
     attr_accessor :client_id, :client_secret, :username, :base_url, :token_path,
                   :query_path, :token_store, :page_size, :max_pages, :token_key_prefix,
                   :on_error, :schema
