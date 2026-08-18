@@ -38,6 +38,9 @@ require 'intacct_rest/query'
 require 'intacct_rest/objects'
 require 'intacct_rest/schema_generator'
 require 'intacct_rest/schema_source'
+require 'intacct_rest/model/base'
+require 'intacct_rest/model/vendor'
+require 'intacct_rest/vendor'
 
 module IntacctRest
   class << self
