@@ -45,7 +45,6 @@ require 'intacct_rest/objects'
 require 'intacct_rest/schema_generator'
 require 'intacct_rest/schema_source'
 
-
 module IntacctRest
   class << self
     attr_writer :configuration
