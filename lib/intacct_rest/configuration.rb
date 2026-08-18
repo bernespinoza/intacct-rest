@@ -40,7 +40,7 @@ module IntacctRest
 
     attr_accessor :client_id, :client_secret, :username, :base_url, :token_path,
                   :query_path, :token_store, :page_size, :max_pages, :token_key_prefix,
-                  :on_error
+                  :on_error, :schema
 
     def initialize
       @base_url         = DEFAULT_BASE_URL

@@ -2,6 +2,8 @@
 
 require "net/http"
 require "json"
+require "yaml"
+require "pathname"
 require "date"
 
 module IntacctRest
@@ -16,6 +18,7 @@ require 'intacct_rest/configuration'
 require 'intacct_rest/client'
 require 'intacct_rest/filter'
 require 'intacct_rest/page'
+require 'intacct_rest/authenticated_request'
 require 'intacct_rest/oauth_client'
 require 'intacct_rest/authenticated_request'
 require 'intacct_rest/custom_field'
@@ -32,6 +35,9 @@ require 'intacct_rest/result/error'
 require 'intacct_rest/post'
 require 'intacct_rest/endpoints/create_vendor'
 require 'intacct_rest/query'
+require 'intacct_rest/objects'
+require 'intacct_rest/schema_generator'
+require 'intacct_rest/schema_source'
 
 module IntacctRest
   class << self

@@ -4,6 +4,7 @@ A small, framework-agnostic Ruby client for [Sage Intacct's REST API v1](https:/
 
 - **OAuth2 token handling** (`client_credentials` and `refresh_token` grants), with pluggable token storage
 - **The `POST /services/core/query` endpoint**, for any Intacct object (invoices, bills, customers, ...), with pagination and a small filter-operator builder
+- **The Objects API** (`GET /objects/{resource}` and `GET /objects/{resource}/{key}`), and a schema generator built on top of it that discovers a resource's fields from a real record
 - **The `POST /objects/accounts-payable/vendor` endpoint**, via `IntacctRest::Endpoints::CreateVendor` (the use case), `IntacctRest::Post` (the generic, reusable "send this model" operation), and `IntacctRest::Model::Vendor` (the data + a small declarative validation DSL), covering every vendor field plus custom fields
 
 It has no Rails, ActiveRecord, or Redis dependency — the host application supplies its own token store and error-handling hook.
@@ -37,6 +38,9 @@ IntacctRest.configure do |config|
   # Called whenever the gem rescues (and re-raises) an error — wire this to your own
   # logging/instrumentation. The gem never logs on its own.
   config.on_error = ->(error, context:) { MyApp::Logger.warn(error.message, context) }
+
+  # A Hash or a YAML file path — see "Schema" below. Defaults to nil (empty).
+  config.schema = "config/intacct_schema.yml"
 end
 ```
 
@@ -98,6 +102,56 @@ end
 
 `each_page` raises `IntacctRest::TooManyPagesError` if `max_pages` is exceeded, rather than silently truncating results.
 
+## Objects API
+
+```ruby
+objects = IntacctRest::Objects.new
+objects.list("accounts-receivable/invoice")        # => Array<Hash> (first page, no pagination)
+objects.find("accounts-receivable/invoice", "42")   # => Hash (single record)
+```
+
+## Schema
+
+`IntacctRest::SchemaGenerator` discovers a resource's fields by sampling **one real record**
+(list → pick one key → fetch it → flatten its keys, nested Hashes dot-joined, e.g.
+`paymentInformation.fullyPaidDate`). This is a **lower bound, not a guarantee of
+completeness** — any field that's nil/empty on the sampled record won't appear (a nil
+`paymentInformation` collapses to one bare `paymentInformation` leaf instead of its nested
+fields), and there's no confirmed sort order on the list endpoint, so the auto-picked record
+is an arbitrary sample, not "the latest." Treat its output as a starting point to hand-review
+and merge, not as ground truth to commit blindly. Pass `key:` to override the auto-picked
+sample with a known-good record.
+
+The gem itself has no opinion on what resources you care about — you supply the mapping:
+
+```ruby
+generator = IntacctRest::SchemaGenerator.new
+resources = { invoices: "accounts-receivable/invoice", payments: "accounts-receivable/payment" }
+
+generator.generate("accounts-receivable/invoice")        # => Array<String>
+generator.generate_all(resources)                         # => {invoices: [...], payments: [...]}
+generator.write("config/intacct_schema.yml", resources)   # dumps YAML, overwrites unconditionally
+```
+
+Written YAML looks like:
+
+```yaml
+invoices:
+  - key
+  - state
+  - paymentInformation.fullyPaidDate
+payments:
+  - key
+  - amount
+```
+
+`IntacctRest::SchemaSource` resolves `Configuration#schema` (a Hash, a YAML path, or nil)
+into field arrays for use as `Query#schema:`. Not auto-wired into `Query` — pass it explicitly
+so `Query` stays resource-agnostic:
+
+```ruby
+fields = IntacctRest::SchemaSource.new(IntacctRest.configuration.schema).for(:invoices)
+IntacctRest::Query.new(resource: "accounts-receivable/invoice", schema: fields, ...)
 ## Creating a vendor
 
 Three pieces work together, each with one job:
@@ -221,6 +275,8 @@ All exceptions inherit from `IntacctRest::Error`:
 - `IntacctRest::ResponseParseError` — response body wasn't valid JSON (`#raw_body`)
 - `IntacctRest::ValidationError` — a model failed validation before any request was sent (`#attributes`)
 - `IntacctRest::TooManyPagesError` — `each_page` exceeded `max_pages` (`#pages_fetched`)
+- `IntacctRest::SchemaGenerationError` — `SchemaGenerator` found no records to sample
+- `IntacctRest::SchemaLoadError` — `SchemaSource` failed to read/parse a YAML file
 
 Non-2xx responses from `IntacctRest::Post`/`Endpoints::CreateVendor` are **not** exceptions — see The Result, above.
 

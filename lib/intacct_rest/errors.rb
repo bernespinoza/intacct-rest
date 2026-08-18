@@ -41,4 +41,8 @@ module IntacctRest
       @pages_fetched = pages_fetched
     end
   end
+
+  class SchemaGenerationError < Error; end
+
+  class SchemaLoadError < Error; end
 end
