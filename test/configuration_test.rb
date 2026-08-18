@@ -48,5 +48,15 @@ class TestConfiguration < Minitest::Test
   def test_on_error_defaults_to_nil
     assert_nil @configuration.on_error
   end
+
+  def test_default_vendor_writable_attributes
+    attributes = IntacctRest::Configuration::DEFAULT_VENDOR_WRITABLE_ATTRIBUTES
+
+    assert attributes.frozen?
+    assert_equal 'id', attributes[:id]
+    assert_equal 'isOneTimeUse', attributes[:is_one_time_use]
+    assert_equal 'overrideOffsetGLAccount', attributes[:override_offset_gl_account]
+    refute_includes attributes.keys, :accountlabel
+  end
 end
 

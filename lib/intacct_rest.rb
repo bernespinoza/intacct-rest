@@ -2,6 +2,7 @@
 
 require "net/http"
 require "json"
+require "date"
 
 module IntacctRest
   API_URI = 'https://api.intacct.com/ia/api'
@@ -16,7 +17,15 @@ require 'intacct_rest/client'
 require 'intacct_rest/filter'
 require 'intacct_rest/page'
 require 'intacct_rest/oauth_client'
+require 'intacct_rest/authenticated_request'
+require 'intacct_rest/validators'
+require 'intacct_rest/validators/presence'
+require 'intacct_rest/validators/kind_of'
+require 'intacct_rest/validators/inclusion'
+require 'intacct_rest/model/base'
+require 'intacct_rest/model/vendor'
 require 'intacct_rest/query'
+require 'intacct_rest/vendor'
 
 module IntacctRest
   class << self
