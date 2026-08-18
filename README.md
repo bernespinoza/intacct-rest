@@ -4,7 +4,7 @@ A small, framework-agnostic Ruby client for [Sage Intacct's REST API v1](https:/
 
 - **OAuth2 token handling** (`client_credentials` and `refresh_token` grants), with pluggable token storage
 - **The `POST /services/core/query` endpoint**, for any Intacct object (invoices, bills, customers, ...), with pagination and a small filter-operator builder
-- **The `POST /objects/accounts-payable/vendor` endpoint**, via `IntacctRest::Vendor` (the operation) and `IntacctRest::Model::Vendor` (the data + a small declarative validation DSL), covering every vendor field plus custom fields
+- **The `POST /objects/accounts-payable/vendor` endpoint**, via `IntacctRest::Endpoints::CreateVendor` (the use case), `IntacctRest::Post` (the generic, reusable "send this model" operation), and `IntacctRest::Model::Vendor` (the data + a small declarative validation DSL), covering every vendor field plus custom fields
 
 It has no Rails, ActiveRecord, or Redis dependency — the host application supplies its own token store and error-handling hook.
 
@@ -100,8 +100,14 @@ end
 
 ## Creating a vendor
 
+Three pieces work together, each with one job:
+
+- **`IntacctRest::Model::Vendor`** — the vendor's data and validations. No config, no token provider, no HTTP knowledge. Build one, inspect it, `valid?`/`errors` it, all without touching the network.
+- **`IntacctRest::Post`** — a generic "send this model" operation. Works against *any* model that responds to `#intacct_object` (the endpoint path), `#payload` (the outgoing JSON), and `#valid?`/`#errors` — not specific to vendors.
+- **`IntacctRest::Endpoints::CreateVendor`** — the vendor-specific use case: calls `Post`, then checks the response actually contains the fields you expect.
+
 ```ruby
-vendor = IntacctRest::Vendor.call(
+vendor = IntacctRest::Model::Vendor.new(
   id:           "V-00014",
   name:         "NCS, Inc.",
   credit_limit: 40_000,
@@ -109,24 +115,50 @@ vendor = IntacctRest::Vendor.call(
   term:         { "id" => "Net 30" }
 )
 
-vendor.key  # => "111"
-vendor.href # => "/objects/accounts-payable/vendor/111"
+result = IntacctRest::Endpoints::CreateVendor.call(vendor: vendor, results: %i[id key href])
+
+result.success? # => true
+vendor.key      # => "111"       (written onto the model by Post, via model.apply_result)
+vendor.href     # => "/objects/accounts-payable/vendor/111"
 ```
 
-`IntacctRest::Vendor.call` is a thin operation object — it doesn't hold vendor data itself. It builds (or accepts) an `IntacctRest::Model::Vendor`, which is where every field from Sage Intacct's vendor object lives as a Ruby-idiomatic snake_case accessor (`is_one_time_use`, `default_lead_time`, `vendor_account_number`, ...), mapped to Intacct's exact camelCase JSON key when `Vendor` builds the request — see `IntacctRest::Configuration::DEFAULT_VENDOR_WRITABLE_ATTRIBUTES` for the full name mapping (the single source of truth both classes read from). Nested objects (`bank_files`, `contacts`, `term`, `bill_payment`, ...) are **not** individually modeled — pass them as raw Hashes using Intacct's native (camelCase) nested key names, as shown for `term` above.
-
-`IntacctRest::Vendor.call` accepts either attributes (as shown above, or as a single positional Hash) or an already-built `Model::Vendor` instance:
-
-```ruby
-model = IntacctRest::Model::Vendor.new(id: "V-00014", name: "NCS, Inc.")
-IntacctRest::Vendor.call(model)
-```
+`IntacctRest::Model::Vendor` exposes every field from Sage Intacct's vendor object as a Ruby-idiomatic snake_case accessor (`is_one_time_use`, `default_lead_time`, `vendor_account_number`, ...), mapped to Intacct's exact camelCase JSON key when `#payload` builds the request — see `IntacctRest::Configuration::DEFAULT_VENDOR_WRITABLE_ATTRIBUTES` for the full name mapping. Nested objects (`bank_files`, `contacts`, `term`, `bill_payment`, ...) are **not** individually modeled — pass them as raw Hashes using Intacct's native (camelCase) nested key names, as shown for `term` above.
 
 You can also build the outgoing JSON payload without sending anything, e.g. for debugging:
 
 ```ruby
-IntacctRest::Vendor.payload(model).to_json # => {"id":"V-00014","name":"NCS, Inc."}
+vendor.payload.to_json # => {"id":"V-00014","name":"NCS, Inc."}
 ```
+
+### Building a model from an existing object
+
+`Model::Vendor.new` also accepts a single positional "source" object — an ActiveRecord record, an `OpenStruct`, another `Model::Vendor` — and pulls any matching attribute off it via duck-typing (`source.respond_to?(attr)`). Explicit keyword attributes always win over whatever the source provided:
+
+```ruby
+vendor = IntacctRest::Model::Vendor.new(some_ar_vendor, credit_limit: 1_000) # override just one field
+```
+
+### The Result
+
+`IntacctRest::Post` (and therefore `Endpoints::CreateVendor`) never raises for the HTTP outcome itself — it always returns an `IntacctRest::Result` (`Result::Success` or `Result::Error`), each responding to `#code`, `#body`, `#response` (alias for `#body`), `#headers`, `#model`, and `#success?`/`#failed?`:
+
+```ruby
+result = IntacctRest::Endpoints::CreateVendor.call(vendor: vendor)
+
+if result.success?
+  result.key   # => "111"  — dynamic access into the response's ia::result
+  result.href
+else
+  result.error # => the parsed ia::error payload
+end
+```
+
+What still raises, before any request is sent or when something is actually broken (not just "Intacct rejected this vendor"):
+
+- `IntacctRest::ValidationError` — the model is invalid (see Validation, below)
+- `IntacctRest::AuthenticationError` — a request 401'd even after a token refresh
+- `IntacctRest::ResponseParseError` — the response body wasn't valid JSON
+- `IntacctRest::ApiError` (from `Endpoints::CreateVendor` specifically) — a *successful* response was missing one of the fields declared in `results:`
 
 ### Validation
 
@@ -136,50 +168,61 @@ IntacctRest::Vendor.payload(model).to_json # => {"id":"V-00014","name":"NCS, Inc
 validate :presence, %i[id name]
 validate :kind_of, :string, %i[id name tax_id ...]
 validate :inclusion, BANK_FILE_COUNTRY_CODES, %i[bank_files_payment_country_code]
+validate :custom, :valid_date, %i[last_payment_made_date]
 ```
 
-Three validator kinds ship in `IntacctRest::Validators`:
+Four validator kinds ship in `IntacctRest::Validators`:
 
 - `:presence` — the attribute must not be `nil`
 - `:kind_of` — the attribute, if present, must be one of a small set of types (`:string`, `:integer`, `:numeric`, `:float`, `:boolean`, `:hash`, `:array`, `:date`, `:time`)
 - `:inclusion` — the attribute, if present, must be included in a given list (e.g. Intacct's documented bank-file country codes)
+- `:custom` — the attribute, if present, is passed to an instance method you name (`record.send(method_name, value)`); a falsy return means invalid
 
-By default, `IntacctRest::Vendor.call` validates the model first, raising `IntacctRest::ValidationError` and skipping the HTTP request entirely if it's invalid — currently that means `id`/`name` presence, every field's documented type, and `bank_files["paymentCountryCode"]` (if set) matching a real country code. Note Intacct can auto-generate `id` when document sequencing is enabled for your company; override `valid?`/`errors` in a `Model::Vendor` subclass if you need to relax that.
+By default, `Post` validates the model first, raising `IntacctRest::ValidationError` and skipping the HTTP request entirely if it's invalid — currently that means `id`/`name` presence, every field's documented type, and `bank_files["paymentCountryCode"]` (if set) matching a real country code. Note Intacct can auto-generate `id` when document sequencing is enabled for your company; override `valid?`/`errors` in a `Model::Vendor` subclass if you need to relax that.
 
 ### Custom fields
 
-Pass a `custom_fields:` Hash — its entries are merged flat into the request payload alongside the standard fields, using whatever field names your Intacct company has configured:
+`custom_fields` is a collection of `IntacctRest::CustomField` (`namespace`/`name`/`value`), serialized as `"#{namespace}::#{name}"`. The namespace defaults to `"nsp"`:
 
 ```ruby
-IntacctRest::Vendor.call(
+IntacctRest::Model::Vendor.new(
   id: "V-00014",
   name: "NCS, Inc.",
-  custom_fields: { "preferredCourier__c" => "UPS" }
+  custom_fields: [IntacctRest::CustomField.new(name: "preferredCourier", value: "UPS")]
 )
+# payload includes: "nsp::preferredCourier" => "UPS"
+```
+
+A flat Hash also works as shorthand — each entry becomes a `CustomField` with the default `"nsp"` namespace:
+
+```ruby
+IntacctRest::Model::Vendor.new(id: "V-00014", name: "NCS, Inc.", custom_fields: { "preferredCourier" => "UPS" })
 ```
 
 ### Subclassing for extra validation
 
-Subclass `IntacctRest::Model::Vendor` (not `IntacctRest::Vendor`) and add your own `validate` declarations — they accumulate on top of the built-in ones:
+Subclass `IntacctRest::Model::Vendor` and add your own `validate` declarations — they accumulate on top of the built-in ones:
 
 ```ruby
 class StrictVendor < IntacctRest::Model::Vendor
   validate :presence, %i[tax_id]
 end
 
-IntacctRest::Vendor.call(StrictVendor.new(id: "V-00014", name: "NCS, Inc."))
+IntacctRest::Endpoints::CreateVendor.call(vendor: StrictVendor.new(id: "V-00014", name: "NCS, Inc."))
 # => raises IntacctRest::ValidationError ("tax_id is required"), no request sent
 ```
 
 ## Errors
 
-All errors inherit from `IntacctRest::Error`:
+All exceptions inherit from `IntacctRest::Error`:
 
 - `IntacctRest::AuthenticationError` — token request failed, or a request 401'd even after a token refresh
-- `IntacctRest::ApiError` — non-2xx response or an `ia::error` payload (`#http_status`, `#body`)
+- `IntacctRest::ApiError` — `Query`: non-2xx response or an `ia::error` payload (`#http_status`, `#body`). `Endpoints::CreateVendor`: a successful response was missing a field declared in `results:`
 - `IntacctRest::ResponseParseError` — response body wasn't valid JSON (`#raw_body`)
-- `IntacctRest::ValidationError` — `Vendor.call` failed client-side validation before any request was sent (`#attributes`)
+- `IntacctRest::ValidationError` — a model failed validation before any request was sent (`#attributes`)
 - `IntacctRest::TooManyPagesError` — `each_page` exceeded `max_pages` (`#pages_fetched`)
+
+Non-2xx responses from `IntacctRest::Post`/`Endpoints::CreateVendor` are **not** exceptions — see The Result, above.
 
 ## Development
 

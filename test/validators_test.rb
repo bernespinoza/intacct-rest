@@ -5,6 +5,7 @@ class TestValidators < Minitest::Test
     assert_equal IntacctRest::Validators::Presence, IntacctRest::Validators.fetch(:presence)
     assert_equal IntacctRest::Validators::KindOf, IntacctRest::Validators.fetch(:kind_of)
     assert_equal IntacctRest::Validators::Inclusion, IntacctRest::Validators.fetch(:inclusion)
+    assert_equal IntacctRest::Validators::Custom, IntacctRest::Validators.fetch(:custom)
   end
 
   def test_fetch_raises_on_unknown_kind_and_lists_known_kinds
@@ -14,6 +15,7 @@ class TestValidators < Minitest::Test
     assert_includes error.message, 'presence'
     assert_includes error.message, 'kind_of'
     assert_includes error.message, 'inclusion'
+    assert_includes error.message, 'custom'
   end
 
   def test_each_validator_yields_every_registered_kind
@@ -23,5 +25,6 @@ class TestValidators < Minitest::Test
     assert_equal IntacctRest::Validators::Presence, seen[:presence]
     assert_equal IntacctRest::Validators::KindOf, seen[:kind_of]
     assert_equal IntacctRest::Validators::Inclusion, seen[:inclusion]
+    assert_equal IntacctRest::Validators::Custom, seen[:custom]
   end
 end
