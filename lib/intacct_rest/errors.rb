@@ -24,6 +24,15 @@ module IntacctRest
     end
   end
 
+  class ValidationError < Error
+    attr_reader :attributes
+
+    def initialize(message, attributes: [])
+      super(message)
+      @attributes = attributes
+    end
+  end
+
   class TooManyPagesError < Error
     attr_reader :pages_fetched
 
