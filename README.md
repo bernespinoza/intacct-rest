@@ -5,6 +5,7 @@ A small, framework-agnostic Ruby client for [Sage Intacct's REST API v1](https:/
 - **OAuth2 token handling** (`client_credentials` and `refresh_token` grants), with pluggable token storage
 - **The `POST /services/core/query` endpoint**, for any Intacct object (invoices, bills, customers, ...), with pagination and a small filter-operator builder
 - **The `POST /objects/accounts-payable/vendor` endpoint**, via `IntacctRest::Endpoints::CreateVendor` (the use case), `IntacctRest::Post` (the generic, reusable "send this model" operation), and `IntacctRest::Model::Vendor` (the data + a small declarative validation DSL), covering every vendor field plus custom fields
+- **The `POST /objects/accounts-receivable/invoice` endpoint**, via `IntacctRest::Endpoints::CreateInvoice` and `IntacctRest::Model::Invoice`, reusing the same `Post`/validation pattern
 
 It has no Rails, ActiveRecord, or Redis dependency — the host application supplies its own token store and error-handling hook.
 
@@ -327,6 +328,29 @@ end
 IntacctRest::Endpoints::CreateVendor.call(vendor: StrictVendor.new(id: "V-00014", name: "NCS, Inc."))
 # => raises IntacctRest::ValidationError ("tax_id is required"), no request sent
 ```
+
+## Creating an invoice
+
+Same three pieces as vendors — `IntacctRest::Model::Invoice` (data + validation), `IntacctRest::Post` (generic send), `IntacctRest::Endpoints::CreateInvoice` (the invoice-specific use case):
+
+```ruby
+invoice = IntacctRest::Model::Invoice.new(
+  invoice_date: "2022-12-06",
+  due_date:     "2022-12-31",
+  customer:     { "id" => "C-00019" },
+  lines: [
+    { "txnAmount" => "100.40", "glAccount" => { "id" => "5004" } }
+  ]
+)
+
+result = IntacctRest::Endpoints::CreateInvoice.call(invoice: invoice, results: %i[id key href])
+
+result.success? # => true
+invoice.key     # => "2091"
+invoice.href    # => "/objects/accounts-receivable/invoice/2091"
+```
+
+`customer` is how an invoice references an existing customer record — like every other nested object in this gem, it's a raw Hash (`{"id" => "..."}`) using Intacct's native key names, not a `Model::Customer` instance; there's no code-level dependency between `Model::Invoice` and `Model::Customer`. Same for `lines` — an Array of raw line-item Hashes (see the [Invoice API docs](https://developer.sage.com/intacct/docs/1/sage-intacct-rest-api) for the full line-item shape). Only `invoice_date` and `due_date` are validated as required at this layer; nested required fields (`customer.id`, `lines[].txnAmount`, ...) are left to Intacct's own validation — the same nested-fields boundary as vendors' `bank_files`/`term`/etc.
 
 ## Errors
 

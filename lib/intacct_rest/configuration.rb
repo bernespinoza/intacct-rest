@@ -38,6 +38,19 @@ module IntacctRest
       restricted_departments: 'restrictedDepartments'
     }.freeze
 
+    # Maps IntacctRest::Model::Invoice's Ruby (snake_case) accessor names
+    # to the exact camelCase JSON field names Intacct's AR invoice object
+    # uses. Nested objects (customer, lines, currency, ...) stay raw
+    # Hashes — not individually modeled, same as Vendor's nested fields.
+    DEFAULT_INVOICE_WRITABLE_ATTRIBUTES = {
+      invoice_number: 'invoiceNumber', state: 'state', reference_number: 'referenceNumber',
+      description: 'description', invoice_date: 'invoiceDate', due_date: 'dueDate',
+      currency: 'currency', customer_message: 'customerMessage', contacts: 'contacts',
+      billback_template: 'billbackTemplate', attachment: 'attachment', customer: 'customer',
+      term: 'term', tax_solution: 'taxSolution', invoice_type: 'invoiceType',
+      invoice_mode: 'invoiceMode', invoice_summary: 'invoiceSummary', lines: 'lines'
+    }.freeze
+
     attr_accessor :client_id, :client_secret, :username, :base_url, :token_path,
                   :query_path, :token_store, :page_size, :max_pages, :token_key_prefix,
                   :on_error, :schema
