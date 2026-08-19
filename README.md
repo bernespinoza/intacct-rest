@@ -6,6 +6,9 @@ A small, framework-agnostic Ruby client for [Sage Intacct's REST API v1](https:/
 - **The `POST /services/core/query` endpoint**, for any Intacct object (invoices, bills, customers, ...), with pagination and a small filter-operator builder
 - **The `POST /objects/accounts-payable/vendor` endpoint**, via `IntacctRest::Endpoints::CreateVendor` (the use case), `IntacctRest::Post` (the generic, reusable "send this model" operation), and `IntacctRest::Model::Vendor` (the data + a small declarative validation DSL), covering every vendor field plus custom fields
 - **The `POST /objects/accounts-receivable/invoice` endpoint**, via `IntacctRest::Endpoints::CreateInvoice` and `IntacctRest::Model::Invoice`, reusing the same `Post`/validation pattern
+- **The `POST /objects/accounts-receivable/term` endpoint**, via `IntacctRest::Endpoints::CreateTerm` and `IntacctRest::Model::Term`
+- **The `POST /objects/accounts-receivable/invoice-line` endpoint**, via `IntacctRest::Endpoints::CreateInvoiceLine` and `IntacctRest::Model::InvoiceLine`
+- **`IntacctRest::Model::Currency`**, a data + validation object for the currency shape shared by invoices and invoice lines (no dedicated create endpoint — Intacct manages currencies elsewhere; this is just a typed helper for building the payload)
 
 It has no Rails, ActiveRecord, or Redis dependency — the host application supplies its own token store and error-handling hook.
 
@@ -352,12 +355,76 @@ invoice.href    # => "/objects/accounts-receivable/invoice/2091"
 
 `customer` is how an invoice references an existing customer record — like every other nested object in this gem, it's a raw Hash (`{"id" => "..."}`) using Intacct's native key names, not a `Model::Customer` instance; there's no code-level dependency between `Model::Invoice` and `Model::Customer`. Same for `lines` — an Array of raw line-item Hashes (see the [Invoice API docs](https://developer.sage.com/intacct/docs/1/sage-intacct-rest-api) for the full line-item shape). Only `invoice_date` and `due_date` are validated as required at this layer; nested required fields (`customer.id`, `lines[].txnAmount`, ...) are left to Intacct's own validation — the same nested-fields boundary as vendors' `bank_files`/`term`/etc.
 
+`term` (payment terms) and `currency` on `Model::Invoice` follow the same rule — they stay plain Hashes on the invoice itself, so nothing about `Model::Invoice` changes. `Model::Term`, `Model::InvoiceLine`, and `Model::Currency` below are separate, optional objects for the cases where you want validation and a typed `#payload` for those pieces individually (e.g. creating a new term, or building an invoice line before nesting its `#payload` into `invoice.lines`) — you're never required to use them.
+
+## Creating a term
+
+```ruby
+term = IntacctRest::Model::Term.new(
+  id:          "2-10 Net 30",
+  description: "N30 with discount",
+  due:         { "days" => 30, "from" => "fromInvoiceDate" }
+)
+
+result = IntacctRest::Endpoints::CreateTerm.call(term: term, results: %i[id key href])
+
+result.success? # => true
+term.key        # => "18"
+```
+
+`id` and `description` are required; `due`, `discount`, and `penalty` are raw Hashes, same nested-fields boundary as everywhere else in this gem.
+
+## Creating an invoice line
+
+`IntacctRest::Model::InvoiceLine` wraps `POST /objects/accounts-receivable/invoice-line` directly, for adding a line to an existing invoice (referenced by `invoice:`):
+
+```ruby
+line = IntacctRest::Model::InvoiceLine.new(
+  invoice:    { "key" => "350" },
+  txn_amount: "70.00",
+  gl_account: { "id" => "4000" }
+)
+
+result = IntacctRest::Endpoints::CreateInvoiceLine.call(invoice_line: line, results: %i[id key href])
+
+result.success? # => true
+line.key        # => "806"
+```
+
+`invoice`, `txn_amount`, and `gl_account` are required. `currency` is read-only on a line (Intacct derives it from the invoice), so it isn't a writable attribute here even though it is on `Model::Invoice`'s header.
+
+To instead build a line as part of a new invoice's `lines:` array, use `line.payload` (or just a raw Hash — both work, since `Model::Invoice#lines` stays a plain Array):
+
+```ruby
+IntacctRest::Model::Invoice.new(
+  invoice_date: "2022-12-06",
+  due_date:     "2022-12-31",
+  customer:     { "id" => "C-00019" },
+  lines:        [line.payload]
+)
+```
+
+## Currency
+
+`IntacctRest::Model::Currency` has no create endpoint of its own — it's a small typed helper for the currency shape that appears on invoices and other objects:
+
+```ruby
+currency = IntacctRest::Model::Currency.new(
+  txn_currency:  "USD",
+  exchange_rate: { "date" => "2022-12-06", "typeId" => "Intacct Daily Rate", "rate" => 0.05112 }
+)
+
+currency.payload # => {"txnCurrency"=>"USD", "exchangeRate"=>{"date"=>"2022-12-06", "typeId"=>"Intacct Daily Rate", "rate"=>0.05112}}
+```
+
+Assign `currency.payload` (or a raw Hash) to `Model::Invoice#currency` the same way as `term`/`customer`.
+
 ## Errors
 
 All exceptions inherit from `IntacctRest::Error`:
 
 - `IntacctRest::AuthenticationError` — token request failed, or a request 401'd even after a token refresh
-- `IntacctRest::ApiError` — `Query`: non-2xx response or an `ia::error` payload (`#http_status`, `#body`). `Endpoints::CreateVendor`: a successful response was missing a field declared in `results:`
+- `IntacctRest::ApiError` — `Query`: non-2xx response or an `ia::error` payload (`#http_status`, `#body`). `Endpoints::CreateVendor`/`CreateInvoice`/`CreateTerm`/`CreateInvoiceLine`: a successful response was missing a field declared in `results:`
 - `IntacctRest::ResponseParseError` — response body wasn't valid JSON (`#raw_body`)
 - `IntacctRest::ValidationError` — a model failed validation before any request was sent (`#attributes`)
 - `IntacctRest::TooManyPagesError` — `each_page` exceeded `max_pages` (`#pages_fetched`)
@@ -366,7 +433,7 @@ All exceptions inherit from `IntacctRest::Error`:
 
 Non-2xx responses from `IntacctRest::Post`/`Endpoints::CreateVendor` are **not** exceptions — see The Result, above.
 
-Non-2xx responses from `IntacctRest::Post`/`Endpoints::CreateVendor` are **not** exceptions — see The Result, above.
+Non-2xx responses from `IntacctRest::Post` and any `Endpoints::CreateX` are **not** exceptions — see The Result, above.
 
 ## Development
 
