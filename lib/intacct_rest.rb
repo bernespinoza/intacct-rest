@@ -20,7 +20,6 @@ require 'intacct_rest/filter'
 require 'intacct_rest/page'
 require 'intacct_rest/authenticated_request'
 require 'intacct_rest/oauth_client'
-require 'intacct_rest/authenticated_request'
 require 'intacct_rest/custom_field'
 require 'intacct_rest/validators'
 require 'intacct_rest/validators/presence'
@@ -45,9 +44,7 @@ require 'intacct_rest/query'
 require 'intacct_rest/objects'
 require 'intacct_rest/schema_generator'
 require 'intacct_rest/schema_source'
-require 'intacct_rest/model/base'
-require 'intacct_rest/model/vendor'
-require 'intacct_rest/vendor'
+
 
 module IntacctRest
   class << self
