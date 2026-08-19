@@ -38,6 +38,47 @@ module IntacctRest
       restricted_departments: 'restrictedDepartments'
     }.freeze
 
+    # Maps IntacctRest::Model::Invoice's Ruby (snake_case) accessor names
+    # to the exact camelCase JSON field names Intacct's AR invoice object
+    # uses. Nested objects (customer, lines, currency, ...) stay raw
+    # Hashes — not individually modeled, same as Vendor's nested fields.
+    DEFAULT_INVOICE_WRITABLE_ATTRIBUTES = {
+      invoice_number: 'invoiceNumber', state: 'state', reference_number: 'referenceNumber',
+      description: 'description', invoice_date: 'invoiceDate', due_date: 'dueDate',
+      currency: 'currency', customer_message: 'customerMessage', contacts: 'contacts',
+      billback_template: 'billbackTemplate', attachment: 'attachment', customer: 'customer',
+      term: 'term', tax_solution: 'taxSolution', invoice_type: 'invoiceType',
+      invoice_mode: 'invoiceMode', invoice_summary: 'invoiceSummary', lines: 'lines'
+    }.freeze
+
+    # Maps IntacctRest::Model::Term's Ruby (snake_case) accessor names to
+    # the exact camelCase JSON field names Intacct's AR term object uses.
+    # due/discount/penalty stay raw Hashes — not individually modeled.
+    DEFAULT_TERM_WRITABLE_ATTRIBUTES = {
+      id: 'id', status: 'status', description: 'description', due: 'due',
+      discount: 'discount', penalty: 'penalty'
+    }.freeze
+
+    # Maps IntacctRest::Model::InvoiceLine's Ruby (snake_case) accessor
+    # names to the exact camelCase JSON field names Intacct's AR invoice
+    # line object uses. Nested objects (glAccount, dimensions, ...) stay
+    # raw Hashes — not individually modeled.
+    DEFAULT_INVOICE_LINE_WRITABLE_ATTRIBUTES = {
+      gl_account: 'glAccount', override_offset_gl_account: 'overrideOffsetGLAccount',
+      txn_amount: 'txnAmount', memo: 'memo', allocation: 'allocation',
+      account_label: 'accountLabel', tax_entries: 'taxEntries', dimensions: 'dimensions',
+      invoice: 'invoice'
+    }.freeze
+
+    # Maps IntacctRest::Model::Currency's Ruby (snake_case) accessor names
+    # to the exact camelCase JSON field names used wherever a currency
+    # object is nested (invoice header, invoice line, ...). Currency has
+    # no standalone create endpoint of its own in Intacct's REST API — this
+    # model exists purely to build/validate that nested Hash.
+    DEFAULT_CURRENCY_ATTRIBUTES = {
+      base_currency: 'baseCurrency', txn_currency: 'txnCurrency', exchange_rate: 'exchangeRate'
+    }.freeze
+
     attr_accessor :client_id, :client_secret, :username, :base_url, :token_path,
                   :query_path, :token_store, :page_size, :max_pages, :token_key_prefix,
                   :on_error, :schema
