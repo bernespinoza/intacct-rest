@@ -7,8 +7,9 @@ module IntacctRest
     # (via IntacctRest::Endpoints::CreateVendor) is what actually sends it.
     #
     # Nested objects (bank_files, contacts, term, bill_payment, ...) are
-    # NOT individually modeled — pass them as raw Hashes using Intacct's
-    # native (camelCase) nested key names, e.g. term: { "id" => "Net 30" }.
+    # pass them as raw Hashes Intacct's
+    # native (camelCase) nested key names, e.g. term: { "id" => "Net 30" }. Or passes a
+    # model instace for them.
     class Vendor < IntacctRest::Model::Base
       INTACCT_OBJECT = '/objects/accounts-payable/vendor'.freeze
 
