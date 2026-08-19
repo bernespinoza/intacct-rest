@@ -11,6 +11,7 @@ A small, framework-agnostic Ruby client for [Sage Intacct's REST API v1](https:/
 - **`IntacctRest::Model::Currency`**, a data + validation object for the currency shape shared by invoices and invoice lines (no dedicated create endpoint — Intacct manages currencies elsewhere; this is just a typed helper for building the payload)
 - **The `POST /objects/accounts-payable/vendor` endpoint**, via `IntacctRest::Vendor` (the operation) and `IntacctRest::Model::Vendor` (the data + a small declarative validation DSL), covering every vendor field plus custom fields
 - **The `POST /objects/accounts-receivable/customer` endpoint**, via `IntacctRest::Endpoints::CreateCustomer` and `IntacctRest::Model::Customer`, reusing the same `Post`/validation pattern
+- **`IntacctRest::Model::Contact`**, a data + validation object for the non-deprecated subset of the contact shape shared by vendors and customers (no dedicated create endpoint — contacts are referenced by id from `contacts`/`contact_list`; this is just a typed helper for building that nested payload)
 
 It has no Rails, ActiveRecord, or Redis dependency — the host application supplies its own token store and error-handling hook.
 
@@ -447,6 +448,20 @@ customer.href   # => "/objects/accounts-receivable/customer/32"
 ```
 
 `vendor` is how a customer references an associated vendor record — like every other nested object in this gem, it's a raw Hash (`{"id" => "..."}`), not a `Model::Vendor` instance; there's no code-level dependency between `Model::Customer` and `Model::Vendor`. Only `name` is required at this layer, matching the schema's own `required: [name]`.
+
+`contacts`/`contact_list` follow the same rule — they stay plain Hashes/Arrays on `Model::Customer` itself, so nothing about `Model::Customer` changes. `Model::Contact` below is a separate, optional object for the case where you want validation and a typed `#payload` for a contact individually — you're never required to use it.
+
+## Contact
+
+`IntacctRest::Model::Contact` has no create endpoint of its own — Intacct references an existing contact by `id` from a vendor's or customer's `contacts`/`contact_list` fields rather than creating one inline. It only exposes the *non-deprecated* subset of the "contacts.default" nested shape (`id`, `showInContactList`, `tax`, `electronicInvoiceDetails`, `internationalTaxId`, `electronicAddress`) — every richer field (`firstName`, `email1`, `phone1`, `mailingAddress`, ...) is individually marked `deprecated: true` in Intacct's schema:
+
+```ruby
+contact = IntacctRest::Model::Contact.new(id: "C-001", show_in_contact_list: true)
+
+contact.payload # => {"id"=>"C-001", "showInContactList"=>true}
+```
+
+Assign `contact.payload` (or a raw Hash) into `Model::Customer#contacts`/`#contact_list` the same way as `vendor`/`term`.
 
 ## Errors
 
