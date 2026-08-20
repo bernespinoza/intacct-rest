@@ -119,6 +119,39 @@ module IntacctRest
       international_tax_id: 'internationalTaxId', electronic_address: 'electronicAddress'
     }.freeze
 
+    # Maps IntacctRest::Model::Bill's Ruby (snake_case) accessor names to
+    # the exact camelCase JSON field names Intacct's AP bill object uses.
+    # Nested objects (vendor, term, currency, lines, ...) stay raw Hashes
+    # — not individually modeled, same as Invoice's nested fields.
+    # Excludes deprecated fields (`purchasing`, `location` — both marked
+    # deprecated: true in the schema in favor of `purchasingDocument` and
+    # nothing, respectively).
+    DEFAULT_BILL_WRITABLE_ATTRIBUTES = {
+      bill_number: 'billNumber', state: 'state', vendor: 'vendor', term: 'term',
+      reference_number: 'referenceNumber', description: 'description', posting_date: 'postingDate',
+      discount_cut_off_date: 'discountCutOffDate', due_date: 'dueDate',
+      recommended_payment_date: 'recommendedPaymentDate', created_date: 'createdDate',
+      is_on_hold: 'isOnHold', is_tax_inclusive: 'isTaxInclusive', payment_priority: 'paymentPriority',
+      contacts: 'contacts', currency: 'currency', tax_solution: 'taxSolution',
+      invoice_type: 'invoiceType', invoice_mode: 'invoiceMode', bill_summary: 'billSummary',
+      bill_back_template: 'billBackTemplate', attachment: 'attachment', lines: 'lines',
+      dispute: 'dispute', refuse: 'refuse'
+    }.freeze
+
+    # Maps IntacctRest::Model::BillLine's Ruby (snake_case) accessor names
+    # to the exact camelCase JSON field names Intacct's AP bill line
+    # object uses. Nested objects (glAccount, dimensions, ...) stay raw
+    # Hashes — not individually modeled.
+    DEFAULT_BILL_LINE_WRITABLE_ATTRIBUTES = {
+      vendor: 'vendor', gl_account: 'glAccount', override_offset_gl_account: 'overrideOffsetGLAccount',
+      account_label: 'accountLabel', txn_amount: 'txnAmount', total_txn_amount: 'totalTxnAmount',
+      memo: 'memo', allocation: 'allocation', has_form1099: 'hasForm1099', form1099: 'form1099',
+      release_to_pay: 'releaseToPay', project: 'project', fixed_asset: 'fixedAsset',
+      amortization_template: 'amortizationTemplate', amortization_start_date: 'amortizationStartDate',
+      amortization_end_date: 'amortizationEndDate', purchasing: 'purchasing',
+      tax_entries: 'taxEntries', dimensions: 'dimensions', bill: 'bill'
+    }.freeze
+
     attr_accessor :client_id, :client_secret, :username, :base_url, :token_path,
                   :query_path, :token_store, :page_size, :max_pages, :token_key_prefix,
                   :on_error, :schema

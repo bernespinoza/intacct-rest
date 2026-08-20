@@ -12,6 +12,8 @@ A small, framework-agnostic Ruby client for [Sage Intacct's REST API v1](https:/
 - **The `POST /objects/accounts-payable/vendor` endpoint**, via `IntacctRest::Vendor` (the operation) and `IntacctRest::Model::Vendor` (the data + a small declarative validation DSL), covering every vendor field plus custom fields
 - **The `POST /objects/accounts-receivable/customer` endpoint**, via `IntacctRest::Endpoints::CreateCustomer` and `IntacctRest::Model::Customer`, reusing the same `Post`/validation pattern
 - **`IntacctRest::Model::Contact`**, a data + validation object for the non-deprecated subset of the contact shape shared by vendors and customers (no dedicated create endpoint — contacts are referenced by id from `contacts`/`contact_list`; this is just a typed helper for building that nested payload)
+- **The `POST /objects/accounts-payable/bill` endpoint**, via `IntacctRest::Endpoints::CreateBill` and `IntacctRest::Model::Bill`, reusing the same `Post`/validation pattern
+- **The `POST /objects/accounts-payable/bill-line` endpoint**, via `IntacctRest::Endpoints::CreateBillLine` and `IntacctRest::Model::BillLine`
 
 It has no Rails, ActiveRecord, or Redis dependency — the host application supplies its own token store and error-handling hook.
 
@@ -463,12 +465,55 @@ contact.payload # => {"id"=>"C-001", "showInContactList"=>true}
 
 Assign `contact.payload` (or a raw Hash) into `Model::Customer#contacts`/`#contact_list` the same way as `vendor`/`term`.
 
+## Creating a bill
+
+Same three pieces as invoices — `IntacctRest::Model::Bill` (data + validation), `IntacctRest::Post` (generic send), `IntacctRest::Endpoints::CreateBill` (the bill-specific use case):
+
+```ruby
+bill = IntacctRest::Model::Bill.new(
+  due_date:     "2024-03-08",
+  created_date: "2024-02-21",
+  vendor:       { "id" => "1099 Int" },
+  currency:     { "baseCurrency" => "USD", "txnCurrency" => "USD" },
+  lines: [
+    { "txnAmount" => "5", "glAccount" => { "id" => "6000" } }
+  ]
+)
+
+result = IntacctRest::Endpoints::CreateBill.call(bill: bill, results: %i[id key href])
+
+result.success? # => true
+bill.key        # => "299"
+bill.href       # => "/objects/accounts-payable/bill/299"
+```
+
+`vendor` is how a bill references an existing vendor record — like every other nested object in this gem, it's a raw Hash (`{"id" => "..."}`), not a `Model::Vendor` instance. Same for `lines`, `term`, and `currency`. Only `due_date` and `created_date` are validated as required at this layer, matching the schema's own `required: [dueDate, createdDate]`; nested required fields (`vendor.id`, `currency.txnCurrency`, `lines[].txnAmount`/`glAccount`, `lines[].dimensions.location`) are left to Intacct's own validation — the same nested-fields boundary as invoices' `customer`/`lines`.
+
+## Creating a bill line
+
+`IntacctRest::Model::BillLine` wraps `POST /objects/accounts-payable/bill-line` directly, for adding a line to an existing bill (referenced by `bill:`):
+
+```ruby
+line = IntacctRest::Model::BillLine.new(
+  bill:       { "key" => "19876" },
+  txn_amount: "5",
+  gl_account: { "id" => "6000" }
+)
+
+result = IntacctRest::Endpoints::CreateBillLine.call(bill_line: line, results: %i[id key href])
+
+result.success? # => true
+line.key        # => "1955"
+```
+
+`bill`, `txn_amount`, and `gl_account` are required. To instead build a line as part of a new bill's `lines:` array, use `line.payload` (or just a raw Hash — both work, since `Model::Bill#lines` stays a plain Array), the same way as `Model::InvoiceLine`.
+
 ## Errors
 
 All exceptions inherit from `IntacctRest::Error`:
 
 - `IntacctRest::AuthenticationError` — token request failed, or a request 401'd even after a token refresh
-- `IntacctRest::ApiError` — `Query`: non-2xx response or an `ia::error` payload (`#http_status`, `#body`). `Endpoints::CreateVendor`/`CreateInvoice`/`CreateTerm`/`CreateInvoiceLine`: a successful response was missing a field declared in `results:`
+- `IntacctRest::ApiError` — `Query`: non-2xx response or an `ia::error` payload (`#http_status`, `#body`). `Endpoints::CreateVendor`/`CreateInvoice`/`CreateTerm`/`CreateInvoiceLine`/`CreateCustomer`/`CreateBill`/`CreateBillLine`: a successful response was missing a field declared in `results:`
 - `IntacctRest::ResponseParseError` — response body wasn't valid JSON (`#raw_body`)
 - `IntacctRest::ValidationError` — a model failed validation before any request was sent (`#attributes`)
 - `IntacctRest::TooManyPagesError` — `each_page` exceeded `max_pages` (`#pages_fetched`)
