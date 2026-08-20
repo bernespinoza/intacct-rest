@@ -79,6 +79,46 @@ module IntacctRest
       base_currency: 'baseCurrency', txn_currency: 'txnCurrency', exchange_rate: 'exchangeRate'
     }.freeze
 
+    # Maps IntacctRest::Model::Customer's Ruby (snake_case) accessor names
+    # to the exact camelCase JSON field names Intacct's customer object
+    # uses. Excludes deprecated fields (electronicAddress, resaleNumber,
+    # enableOnlineACHPayment, enableOnlineCardPayment, activationDate) in
+    # favor of their replacements or because they're pure legacy no-ops —
+    # same treatment as Vendor's deprecated `accountlabel`.
+    DEFAULT_CUSTOMER_WRITABLE_ATTRIBUTES = {
+      id: 'id', name: 'name', status: 'status', customer_type: 'customerType', parent: 'parent',
+      sales_representative: 'salesRepresentative', tax_id: 'taxId',
+      default_revenue_gl_account: 'defaultRevenueGLAccount', shipping_method: 'shippingMethod',
+      credit_limit: 'creditLimit', is_on_hold: 'isOnHold', contacts: 'contacts',
+      contact_list: 'contactList', restrictions: 'restrictions',
+      customer_email_templates: 'customerEmailTemplates', discount_percent: 'discountPercent',
+      term: 'term', advance_bill_by: 'advanceBillBy', advance_bill_by_type: 'advanceBillByType',
+      customer_resale_number: 'customerResaleNumber', delivery_options: 'deliveryOptions',
+      override_price_list: 'overridePriceList', customer_message: 'customerMessage',
+      currency: 'currency', email_opt_in: 'emailOptIn', territory: 'territory',
+      is_one_time_use: 'isOneTimeUse', disable_refund: 'disableRefund', vendor: 'vendor',
+      account_group: 'accountGroup', account_label: 'accountLabel', attachment: 'attachment',
+      retainage_percentage: 'retainagePercentage', notes: 'notes', price_list: 'priceList',
+      price_schedule: 'priceSchedule', override_offset_gl_account: 'overrideOffsetGLAccount',
+      customer_restriction: 'customerRestriction', restricted_locations: 'restrictedLocations',
+      restricted_departments: 'restrictedDepartments', customer_account_health: 'customerAccountHealth'
+    }.freeze
+
+    # Maps IntacctRest::Model::Contact's Ruby (snake_case) accessor names
+    # to the exact camelCase JSON field names Intacct's contact object
+    # uses. Deliberately a small subset of the "contacts.default" nested
+    # shape (which appears identically inside both the vendor and customer
+    # specs) — every other field there (firstName, lastName, email1/2,
+    # phone1/2, mobile, pager, fax, url1/2, companyName, mailingAddress,
+    # ...) is individually marked deprecated: true in Intacct's schema, in
+    # favor of referencing an existing contact by id. Contact has no
+    # standalone create endpoint documented.
+    DEFAULT_CONTACT_ATTRIBUTES = {
+      id: 'id', show_in_contact_list: 'showInContactList', tax: 'tax',
+      electronic_invoice_details: 'electronicInvoiceDetails',
+      international_tax_id: 'internationalTaxId', electronic_address: 'electronicAddress'
+    }.freeze
+
     attr_accessor :client_id, :client_secret, :username, :base_url, :token_path,
                   :query_path, :token_store, :page_size, :max_pages, :token_key_prefix,
                   :on_error, :schema

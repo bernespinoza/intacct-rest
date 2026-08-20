@@ -32,6 +32,8 @@ require 'intacct_rest/model/invoice'
 require 'intacct_rest/model/term'
 require 'intacct_rest/model/invoice_line'
 require 'intacct_rest/model/currency'
+require 'intacct_rest/model/customer'
+require 'intacct_rest/model/contact'
 require 'intacct_rest/result/base'
 require 'intacct_rest/result/success'
 require 'intacct_rest/result/error'
@@ -40,11 +42,11 @@ require 'intacct_rest/endpoints/create_vendor'
 require 'intacct_rest/endpoints/create_invoice'
 require 'intacct_rest/endpoints/create_term'
 require 'intacct_rest/endpoints/create_invoice_line'
+require 'intacct_rest/endpoints/create_customer'
 require 'intacct_rest/query'
 require 'intacct_rest/objects'
 require 'intacct_rest/schema_generator'
 require 'intacct_rest/schema_source'
-
 
 module IntacctRest
   class << self

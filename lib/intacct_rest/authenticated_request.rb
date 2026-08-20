@@ -3,6 +3,7 @@
 module IntacctRest
   # Shared by any class that sends one authenticated HTTP request to the
   # Intacct REST API: retries once on 401 (refreshing the token first).
+  # parses JSON, and raises on a non-2xx response or an `ia::error` payload.
   # Stops there — pagination (Query#each_page) and response shaping (Page)
   # are the including class's responsibility, not this module's.
   #
