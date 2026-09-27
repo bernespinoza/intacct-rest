@@ -1,14 +1,16 @@
 # frozen_string_literal: true
 
 module IntacctRest
-  # Generic operation for POST-ing any model that responds to
-  # #intacct_object (the endpoint path), #payload (the outgoing JSON
-  # hash), and #valid?/#errors. Raises IntacctRest::ValidationError if the
-  # model is invalid, before sending anything. Otherwise always returns an
+  # Generic operation for PATCH-ing (updating) any model that responds to
+  # #intacct_object (the collection path), #key (the record appended to
+  # it), #update_payload (the outgoing JSON hash — only the fields to
+  # change), and #valid?/#errors with an :update context. Raises
+  # IntacctRest::ValidationError if the model is invalid for update,
+  # before sending anything. Otherwise always returns an
   # IntacctRest::Result (Success or Error) — never raises for the HTTP
   # outcome itself. On success, calls model.apply_result(result) so the
   # model can absorb whatever it cares about from the response.
-  class Post
+  class Patch
     include AuthenticatedRequest
 
     def self.call(model, config: IntacctRest.configuration, token_provider: nil)
@@ -25,11 +27,12 @@ module IntacctRest
     attr_reader :config, :token_provider
 
     def perform(model)
-      errors = model.errors(:create)
+      errors = model.errors(:update)
       raise IntacctRest::ValidationError.new(errors.join('; '), attributes: errors) unless errors.empty?
 
-      response = authenticated_response(:post, model.intacct_object, body: model.payload)
-      parsed = parse_json(response.body, model.intacct_object)
+      path = "#{model.intacct_object}/#{model.key}"
+      response = authenticated_response(:patch, path, body: model.update_payload)
+      parsed = parse_json(response.body, path)
       result = build_result(model, response, parsed)
       model.apply_result(result) if result.success?
       result

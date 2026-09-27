@@ -6,10 +6,12 @@ module IntacctRest
     HTTP_GET  = 'Get'.freeze
     HTTP_PUT  = 'Put'.freeze
     HTTP_DELETE = 'Delete'.freeze
+    HTTP_PATCH = 'Patch'.freeze
     METHODS = {
       post:   HTTP_POST,
       get:    HTTP_GET,
       put:    HTTP_PUT,
+      patch:  HTTP_PATCH,
       delete: HTTP_DELETE
     }
     attr_reader :uri, :http, :net_request
