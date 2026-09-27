@@ -4,7 +4,10 @@ module IntacctRest
   module Model
     # The vendor's data and validations only — no config, no token
     # provider, no HTTP. Build and inspect one freely; IntacctRest::Post
-    # (via IntacctRest::Endpoints::CreateVendor) is what actually sends it.
+    # (via IntacctRest::Endpoints::CreateVendor) and IntacctRest::Patch
+    # (via IntacctRest::Endpoints::UpdateVendor) are what actually send it.
+    # Create requires id/name; update requires key and sends only the
+    # fields that are set (see #update_payload).
     #
     # Nested objects (bank_files, contacts, term, bill_payment, ...) are
     # pass them as raw Hashes Intacct's
@@ -22,6 +25,10 @@ module IntacctRest
         key href is_system_generated customer employee total_due last_bill_created_date
         last_payment_made_date web_url audit entity
       ].freeze
+
+      # Writable on create but readOnly on PATCH — left out of
+      # #update_payload.
+      UPDATE_READONLY_ATTRIBUTES = %i[id].freeze
 
       # The exact enum from the OpenAPI bankFiles.paymentCountryCode /
       # country-code schema (nil is separately allowed by the :inclusion
@@ -42,7 +49,9 @@ module IntacctRest
       attr_accessor(*READONLY_ATTRIBUTES)
       attr_reader :custom_fields
 
-      validate :presence, %i[id name]
+      validate :presence, %i[id name], on: :create
+      validate :presence, %i[key], on: :update
+      validate :kind_of, :string, %i[key], on: :update
 
       validate :kind_of, :string, %i[
         id name status state file_payment_service tax_id notes preferred_payment_method
@@ -99,7 +108,15 @@ module IntacctRest
         end.merge(custom_fields_payload)
       end
 
-      # Called by IntacctRest::Post after a successful create.
+      # The PATCH body: #payload minus fields Intacct treats as readOnly on
+      # update. nil fields are already left out, so only what was set gets
+      # sent — Intacct leaves everything else unchanged.
+      def update_payload
+        payload.except(*UPDATE_READONLY_ATTRIBUTES.map { |attr| WRITABLE_ATTRIBUTES.fetch(attr) })
+      end
+
+      # Called by IntacctRest::Post/IntacctRest::Patch after a successful
+      # create/update.
       def apply_result(result)
         data = result.result
         self.key = data['key'] if data['key']

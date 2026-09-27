@@ -36,21 +36,21 @@ class TestModelVendor < Minitest::Test
   end
 
   def test_valid_with_id_and_name
-    assert IntacctRest::Model::Vendor.new(id: 'V-00014', name: 'NCS, Inc.').valid?
+    assert IntacctRest::Model::Vendor.new(id: 'V-00014', name: 'NCS, Inc.').valid?(:create)
   end
 
   def test_invalid_without_id
     vendor = IntacctRest::Model::Vendor.new(name: 'NCS, Inc.')
 
-    refute vendor.valid?
-    assert_includes vendor.errors, 'id is required'
+    refute vendor.valid?(:create)
+    assert_includes vendor.errors(:create), 'id is required'
   end
 
   def test_invalid_without_name
     vendor = IntacctRest::Model::Vendor.new(id: 'V-00014')
 
-    refute vendor.valid?
-    assert_includes vendor.errors, 'name is required'
+    refute vendor.valid?(:create)
+    assert_includes vendor.errors(:create), 'name is required'
   end
 
   def test_invalid_with_wrong_kind_of_attribute
@@ -89,9 +89,9 @@ class TestModelVendor < Minitest::Test
 
     vendor = strict_vendor_class.new(id: 'V-00014')
 
-    refute vendor.valid?
-    assert_includes vendor.errors, 'name is required'
-    assert_includes vendor.errors, 'tax_id is required'
+    refute vendor.valid?(:create)
+    assert_includes vendor.errors(:create), 'name is required'
+    assert_includes vendor.errors(:create), 'tax_id is required'
   end
 
   def test_subclass_can_add_a_custom_validator
@@ -175,5 +175,58 @@ class TestModelVendor < Minitest::Test
     assert_equal '111', vendor.key
     assert_equal '/x/111', vendor.href
     assert_equal 'AUTO-1', vendor.id
+  end
+
+  def test_update_payload_leaves_out_readonly_id_but_keeps_nested_objects_and_custom_fields
+    vendor = IntacctRest::Model::Vendor.new(key: '111', id: 'V-00014', billing_type: 'balanceForward',
+                                             form1099: { 'nameOn1099' => 'NCS', 'type' => 'MISC' },
+                                             custom_fields: { 'preferredCourier' => 'UPS' })
+
+    assert_equal(
+      { 'billingType' => 'balanceForward', 'form1099' => { 'nameOn1099' => 'NCS', 'type' => 'MISC' },
+        'nsp::preferredCourier' => 'UPS' },
+      vendor.update_payload
+    )
+    assert_equal 'V-00014', vendor.payload['id'] # create payload unchanged
+  end
+
+  def test_valid_for_update_with_only_key
+    assert IntacctRest::Model::Vendor.new(key: '111').valid?(:update)
+  end
+
+  def test_invalid_for_update_without_key
+    vendor = IntacctRest::Model::Vendor.new(billing_type: 'balanceForward')
+
+    refute vendor.valid?(:update)
+    assert_includes vendor.errors(:update), 'key is required'
+  end
+
+  def test_invalid_for_update_with_non_string_key
+    vendor = IntacctRest::Model::Vendor.new(key: 111)
+
+    refute vendor.valid?(:update)
+    assert_includes vendor.errors(:update), 'key must be a string'
+  end
+
+  def test_update_does_not_require_id_or_name
+    errors = IntacctRest::Model::Vendor.new(key: '111').errors(:update)
+
+    refute_includes errors, 'id is required'
+    refute_includes errors, 'name is required'
+  end
+
+  def test_create_does_not_require_key
+    refute_includes IntacctRest::Model::Vendor.new(id: 'V-00014', name: 'NCS, Inc.').errors(:create), 'key is required'
+  end
+
+  def test_nested_object_validations_apply_on_update
+    vendor = IntacctRest::Model::Vendor.new(key: '111', term: 'Net 30', contact_list: {},
+                                             bank_files: { 'paymentCountryCode' => 'zz' })
+
+    errors = vendor.errors(:update)
+
+    assert_includes errors, 'term must be a hash'
+    assert_includes errors, 'contact_list must be a array'
+    assert(errors.any? { |error| error.include?('bank_files_payment_country_code') })
   end
 end

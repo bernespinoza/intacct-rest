@@ -17,9 +17,13 @@ module IntacctRest
         # final Array of attribute names are passed through to that
         # validator (e.g. the type symbol for :kind_of, the list for
         # :inclusion).
-        def validate(kind, *args)
+        #
+        # on: an optional operation context (:create, :update, ...). A
+        # validation declared with on: only runs when #errors/#valid? is
+        # called with that same context; without on: it always runs.
+        def validate(kind, *args, on: nil)
           attributes = Array(args.pop)
-          validators << { kind: kind, attributes: attributes, options: args }
+          validators << { kind: kind, attributes: attributes, options: args, on: on }
         end
 
         def validators
@@ -27,15 +31,17 @@ module IntacctRest
         end
       end
 
-      def errors
+      def errors(context = nil)
         self.class.validators.flat_map do |spec|
+          next [] unless spec[:on].nil? || spec[:on] == context
+
           validator = IntacctRest::Validators.fetch(spec[:kind])
           spec[:attributes].flat_map { |attribute| validator.call(self, attribute, *spec[:options]) }
         end
       end
 
-      def valid?
-        errors.empty?
+      def valid?(context = nil)
+        errors(context).empty?
       end
     end
   end

@@ -66,9 +66,16 @@ class TestClient < Minitest::Test
     assert_equal common_client.request_method, IntacctRest::Client::HTTP_GET
   end
 
-  def test_request_method_invalid
+  def test_request_method_patch
     uri = 'https://www.example.com'
     common_client = @client.new(uri, :patch)
+    assert_equal common_client.request_method, IntacctRest::Client::HTTP_PATCH
+    assert_instance_of Net::HTTP::Patch, common_client.net_request
+  end
+
+  def test_request_method_invalid
+    uri = 'https://www.example.com'
+    common_client = @client.new(uri, :head)
     assert_equal common_client.request_method, IntacctRest::Client::HTTP_POST
   end
 end
