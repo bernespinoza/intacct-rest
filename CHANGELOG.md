@@ -25,6 +25,7 @@ First public release.
 - A validation DSL (`Model::Base.validate`) with `:presence`, `:kind_of`, `:inclusion` and `:custom` validators and `on: :create`/`on: :update` contexts.
 - `IntacctRest::Result::Success`/`Result::Error`: endpoints return a Result and never raise for the HTTP outcome.
 - An error hierarchy under `IntacctRest::Error`: `AuthenticationError`, `ApiError`, `ResponseParseError`, `ValidationError`, `TooManyPagesError`, `SchemaGenerationError`, `SchemaLoadError`.
+- Optional `on_error` hook on `Configuration`, called with `(error, context:)` right before the gem raises an `ApiError` from an Intacct request (non-2xx response or `ia::error` payload), an `AuthenticationError`, a `ResponseParseError`, or a `SchemaLoadError`; exceptions raised by the hook are ignored.
 - MIT license, CONTRIBUTING.md, and GitHub issue/pull request templates.
 
 [Unreleased]: https://github.com/bernespinoza/intacct-rest/compare/v1.0.0...HEAD
