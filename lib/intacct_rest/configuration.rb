@@ -7,7 +7,7 @@ module IntacctRest
     DEFAULT_MAX_PAGES      = 50
     DEFAULT_TOKEN_KEY_PREFIX = 'intacct_rest:oauth'.freeze
 
-    # Maps IntacctRest::Vendor's Ruby (snake_case) accessor names to the
+    # Maps IntacctRest::Model::Vendor's Ruby (snake_case) accessor names to the
     # exact camelCase JSON field names Intacct's vendor object uses. Kept
     # as explicit pairs rather than derived by a camelCase<->snake_case
     # regex, since a couple of fields have acronym runs a naive regex
