@@ -80,7 +80,49 @@ class TestPost < Minitest::Test
     assert_raises(IntacctRest::ResponseParseError) { IntacctRest::Post.call(@vendor) }
   end
 
+  def test_on_error_receives_response_parse_error_once
+    calls = record_on_error
+    stub_token_request
+    stub_request(:post, @vendor_url).to_return(status: 201, body: 'not json')
+
+    error = assert_raises(IntacctRest::ResponseParseError) { IntacctRest::Post.call(@vendor) }
+
+    assert_equal [[error, { operation: :api_request, path: @vendor.intacct_object }]], calls
+  end
+
+  def test_on_error_is_not_called_for_a_failed_result
+    calls = record_on_error
+    stub_token_request
+    stub_request(:post, @vendor_url).to_return(status: 400, body: { 'ia::result' => { 'ia::error' => {} } }.to_json)
+
+    assert IntacctRest::Post.call(@vendor).failed?
+    assert_empty calls
+  end
+
+  def test_on_error_is_not_called_for_a_validation_error
+    calls = record_on_error
+
+    assert_raises(IntacctRest::ValidationError) { IntacctRest::Post.call(IntacctRest::Model::Vendor.new(name: 'NCS')) }
+    assert_empty calls
+  end
+
+  def test_on_error_is_called_once_when_the_token_endpoint_fails_during_a_post
+    calls = record_on_error
+    token_url = "#{IntacctRest.configuration.base_url}#{IntacctRest.configuration.token_path}"
+    stub_request(:post, token_url).to_return(status: 500, body: 'boom')
+
+    error = assert_raises(IntacctRest::AuthenticationError) { IntacctRest::Post.call(@vendor) }
+
+    assert_equal [[error, { operation: :token_request, path: '/oauth2/token', grant_type: 'client_credentials' }]], calls
+  end
+
   private
+
+  def record_on_error
+    calls = []
+    IntacctRest.configuration.on_error = ->(error, context:) { calls << [error, context] }
+    calls
+  end
 
   def stub_token_request
     token_url = "#{IntacctRest.configuration.base_url}#{IntacctRest.configuration.token_path}"

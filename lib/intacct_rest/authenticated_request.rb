@@ -10,6 +10,8 @@ module IntacctRest
   # Including classes must expose private `config` and `token_provider`
   # readers (not enforced by Ruby — just the implicit contract here).
   module AuthenticatedRequest
+    include ErrorReporting
+
     private
 
     # Raises IntacctRest::ApiError for a non-2xx response or an `ia::error`
@@ -19,14 +21,16 @@ module IntacctRest
       response = send_request(method, path, body, retried: false)
 
       unless response.is_a?(Net::HTTPSuccess)
-        raise IntacctRest::ApiError.new("HTTP #{response.code} requesting #{path}",
-                                         http_status: response.code, body: response.body)
+        raise_reported IntacctRest::ApiError.new("HTTP #{response.code} requesting #{path}",
+                                                  http_status: response.code, body: response.body),
+                       operation: :api_request, path: path, http_status: response.code
       end
 
       parsed = parse_json(response.body, path)
 
       if parsed['ia::error']
-        raise IntacctRest::ApiError.new("API error requesting #{path}", http_status: response.code, body: parsed)
+        raise_reported IntacctRest::ApiError.new("API error requesting #{path}", http_status: response.code, body: parsed),
+                       operation: :api_request, path: path, http_status: response.code
       end
 
       parsed
@@ -49,7 +53,10 @@ module IntacctRest
       response = client.request
 
       if response.is_a?(Net::HTTPUnauthorized)
-        raise IntacctRest::AuthenticationError, 'Authentication failed after token refresh' if retried
+        if retried
+          raise_reported IntacctRest::AuthenticationError.new('Authentication failed after token refresh'),
+                         operation: :api_request, path: path, http_status: response.code
+        end
 
         token_provider.refresh_access_token
         return send_request(method, path, body, retried: true)
@@ -61,7 +68,8 @@ module IntacctRest
     def parse_json(body, path)
       JSON.parse(body)
     rescue JSON::ParserError => e
-      raise IntacctRest::ResponseParseError.new("#{e.message} (#{path})", raw_body: body)
+      raise_reported IntacctRest::ResponseParseError.new("#{e.message} (#{path})", raw_body: body),
+                     operation: :api_request, path: path
     end
   end
 end
