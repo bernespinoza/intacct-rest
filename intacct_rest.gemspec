@@ -2,7 +2,7 @@
 
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'intacct_rest'
+require 'intacct_rest/version'
 
 Gem::Specification.new do |spec|
   spec.name                 = 'intacct-rest'
@@ -20,12 +20,10 @@ Gem::Specification.new do |spec|
     'rubygems_mfa_required' => 'true'
   }
 
-  spec.files                = `git ls-files`.split($/)
-  spec.executables          = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
-  spec.test_files           = spec.files.grep(%r{^(test|spec|features)/})
+  spec.files                = Dir.glob('lib/**/*.rb', base: __dir__) + %w[README.md LICENSE.txt CHANGELOG.md]
   spec.require_paths        = ['lib']
 
-  spec.extra_rdoc_files     = ['README.md', 'LICENSE.txt']
+  spec.extra_rdoc_files     = ['README.md', 'LICENSE.txt', 'CHANGELOG.md']
   spec.rdoc_options         = ['--charset=UTF-8']
 
   spec.required_ruby_version = '>= 3'

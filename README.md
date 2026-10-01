@@ -509,9 +509,9 @@ Non-2xx responses from `IntacctRest::Post`/`IntacctRest::Patch` and any endpoint
 
 ## Development
 
-```ruby
+```sh
 bundle install
-rake test
+bundle exec rake test
 ```
 
 ## Contributing

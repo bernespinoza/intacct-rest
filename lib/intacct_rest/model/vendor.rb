@@ -10,9 +10,9 @@ module IntacctRest
     # fields that are set (see #update_payload).
     #
     # Nested objects (bank_files, contacts, term, bill_payment, ...) are
-    # pass them as raw Hashes Intacct's
-    # native (camelCase) nested key names, e.g. term: { "id" => "Net 30" }. Or passes a
-    # model instace for them.
+    # not individually modeled: pass them as raw Hashes using Intacct's
+    # native (camelCase) nested key names, e.g. term: { "id" => "Net 30" },
+    # or a helper's #payload, e.g. contacts: contact.payload.
     class Vendor < IntacctRest::Model::Base
       INTACCT_OBJECT = '/objects/accounts-payable/vendor'.freeze
 
