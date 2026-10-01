@@ -505,3 +505,11 @@ Non-2xx responses from `IntacctRest::Post`/`IntacctRest::Patch` and any endpoint
 bundle install
 rake test
 ```
+
+## Contributing
+
+Bug reports and pull requests are welcome on GitHub at https://github.com/bernespinoza/intacct-rest. Please open an issue first; see [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
+
+## License
+
+The gem is available as open source under the terms of the [MIT License](LICENSE.txt).

@@ -11,6 +11,14 @@ Gem::Specification.new do |spec|
   spec.email                = ['bernardo466@gmail.com']
   spec.summary              = 'A Ruby wrapper for Intacct SAGE Rest API'
   spec.description          = "Allows to use SAGE Rest API for read, create and update SAGE's clients data"
+  spec.license              = 'MIT'
+  spec.homepage             = 'https://github.com/bernespinoza/intacct-rest'
+  spec.metadata             = {
+    'source_code_uri'       => 'https://github.com/bernespinoza/intacct-rest',
+    'bug_tracker_uri'       => 'https://github.com/bernespinoza/intacct-rest/issues',
+    'changelog_uri'         => 'https://github.com/bernespinoza/intacct-rest/blob/main/CHANGELOG.md',
+    'rubygems_mfa_required' => 'true'
+  }
 
   spec.files                = `git ls-files`.split($/)
   spec.executables          = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
