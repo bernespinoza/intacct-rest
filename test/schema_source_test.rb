@@ -66,4 +66,43 @@ class TestSchemaSource < Minitest::Test
     source = IntacctRest::SchemaSource.new(42)
     assert_raises(ArgumentError) { source.for(:invoices) }
   end
+
+  def test_on_error_receives_schema_load_error_for_a_missing_file
+    calls = []
+    config = IntacctRest::Configuration.new
+    config.on_error = ->(error, context:) { calls << [error, context] }
+    source = IntacctRest::SchemaSource.new('/nonexistent/path/schema.yml', config: config)
+
+    error = assert_raises(IntacctRest::SchemaLoadError) { source.for(:invoices) }
+
+    assert_equal [[error, { operation: :schema_load, path: '/nonexistent/path/schema.yml' }]], calls
+  end
+
+  def test_on_error_receives_schema_load_error_for_malformed_yaml
+    calls = []
+    config = IntacctRest::Configuration.new
+    config.on_error = ->(error, context:) { calls << [error.class, context] }
+
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'schema.yml')
+      File.write(path, "invoices: [key, state\n")
+
+      source = IntacctRest::SchemaSource.new(path, config: config)
+      assert_raises(IntacctRest::SchemaLoadError) { source.for(:invoices) }
+
+      assert_equal [[IntacctRest::SchemaLoadError, { operation: :schema_load, path: path }]], calls
+    end
+  end
+
+  def test_reports_through_the_global_configuration_without_config_keyword
+    calls = []
+    IntacctRest.configuration.on_error = ->(error, context:) { calls << error.class }
+    source = IntacctRest::SchemaSource.new('/nonexistent/path/schema.yml')
+
+    assert_raises(IntacctRest::SchemaLoadError) { source.for(:invoices) }
+
+    assert_equal [IntacctRest::SchemaLoadError], calls
+  ensure
+    IntacctRest.reset
+  end
 end

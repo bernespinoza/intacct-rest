@@ -62,4 +62,56 @@ class TestOauthClient < Minitest::Test
 
     assert_raises(IntacctRest::AuthenticationError) { @oauth.access_token }
   end
+
+  def test_on_error_receives_token_failure_with_safe_context_only
+    calls = record_on_error
+    stub_request(:post, @token_url).to_return(status: 500, body: 'boom')
+
+    error = assert_raises(IntacctRest::AuthenticationError) { @oauth.access_token }
+
+    assert_equal [[error, { operation: :token_request, path: '/oauth2/token', grant_type: 'client_credentials' }]], calls
+    secrets = %w[test-client-id test-client-secret test-username]
+    assert_empty calls.first.last.values & secrets
+  end
+
+  def test_on_error_receives_response_parse_error_from_token_endpoint
+    calls = record_on_error
+    stub_request(:post, @token_url).to_return(status: 200, body: 'not json')
+
+    error = assert_raises(IntacctRest::ResponseParseError) { @oauth.access_token }
+
+    assert_equal [[error, { operation: :token_request, path: '/oauth2/token', grant_type: 'client_credentials' }]], calls
+  end
+
+  def test_on_error_is_not_called_when_a_failed_refresh_recovers
+    calls = record_on_error
+    IntacctRest.configuration.token_store.write('intacct_rest:oauth:refresh_token', 'stale-ref')
+    stub_request(:post, @token_url)
+      .with { |req| JSON.parse(req.body)['grant_type'] == 'refresh_token' }
+      .to_return(status: 401, body: 'invalid_grant')
+    stub_request(:post, @token_url)
+      .with { |req| JSON.parse(req.body)['grant_type'] == 'client_credentials' }
+      .to_return(status: 200, body: { access_token: 'tok-3', expires_in: 3600 }.to_json)
+
+    assert_equal 'tok-3', @oauth.refresh_access_token
+    assert_empty calls
+  end
+
+  def test_on_error_is_called_once_when_refresh_and_fallback_both_fail
+    calls = record_on_error
+    IntacctRest.configuration.token_store.write('intacct_rest:oauth:refresh_token', 'stale-ref')
+    stub_request(:post, @token_url).to_return(status: 401, body: 'invalid_grant')
+
+    error = assert_raises(IntacctRest::AuthenticationError) { @oauth.refresh_access_token }
+
+    assert_equal [[error, { operation: :token_request, path: '/oauth2/token', grant_type: 'client_credentials' }]], calls
+  end
+
+  private
+
+  def record_on_error
+    calls = []
+    IntacctRest.configuration.on_error = ->(error, context:) { calls << [error, context] }
+    calls
+  end
 end

@@ -7,8 +7,11 @@ module IntacctRest
   #   IntacctRest::SchemaSource.new({invoices: %w[key state]}).for(:invoices)
   #   IntacctRest::SchemaSource.new("config/intacct_schema.yml").for(:invoices)
   class SchemaSource
-    def initialize(source)
+    include ErrorReporting
+
+    def initialize(source, config: IntacctRest.configuration)
       @source = source
+      @config = config
     end
 
     def for(resource_type)
@@ -17,7 +20,7 @@ module IntacctRest
 
     private
 
-    attr_reader :source
+    attr_reader :source, :config
 
     def data
       @data ||= normalize(source)
@@ -39,7 +42,8 @@ module IntacctRest
     def load_yaml(path)
       YAML.safe_load_file(path.to_s) || {}
     rescue Errno::ENOENT, Psych::Exception => e
-      raise IntacctRest::SchemaLoadError, "Failed to load schema from #{path}: #{e.message}"
+      raise_reported IntacctRest::SchemaLoadError.new("Failed to load schema from #{path}: #{e.message}"),
+                     operation: :schema_load, path: path.to_s
     end
   end
 end

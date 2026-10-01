@@ -4,6 +4,8 @@ module IntacctRest
   # OAuth2 token handling against Intacct's v1 token endpoint: client_credentials
   # and refresh_token grants, with pluggable token storage (see Configuration#token_store).
   class OauthClient
+    include ErrorReporting
+
     TOKEN_EXPIRY_BUFFER = 60 # seconds
 
     def initialize(config: IntacctRest.configuration)
@@ -23,8 +25,13 @@ module IntacctRest
 
     attr_reader :config
 
+    # Token errors are reported here, not in post_token: a failed
+    # refresh_token exchange is recovered by falling back to this method, so
+    # only errors leaving fetch_token actually reach the caller.
     def fetch_token
       store_tokens(post_token(grant_type: 'client_credentials'))
+    rescue IntacctRest::Error => e
+      raise_reported e, operation: :token_request, path: config.token_path, grant_type: 'client_credentials'
     end
 
     def exchange_refresh_token(refresh)

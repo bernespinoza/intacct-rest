@@ -45,8 +45,16 @@ IntacctRest.configure do |config|
   # Swap in your own — anything responding to #read(key), #write(key, value, ttl:), #delete(key):
   config.token_store = MyApp::RedisTokenStore.new(Redis.new(url: ENV.fetch("REDIS_URL")))
 
-  # Called whenever the gem rescues (and re-raises) an error — wire this to your own
-  # logging/instrumentation. The gem never logs on its own.
+  # Optional. Called with (error, context:) right before the gem raises an ApiError from
+  # an Intacct request (non-2xx response or ia::error payload), an AuthenticationError,
+  # a ResponseParseError, or a SchemaLoadError — wire this to your own logging/
+  # instrumentation. context: holds only operation (:api_request, :token_request,
+  # :schema_load), path, and http_status / grant_type when known — never credentials,
+  # tokens or bodies. Not called for errors the gem recovers from (a failed refresh
+  # falling back to client_credentials), errors raised before any request
+  # (ValidationError, ArgumentError), the results: check on endpoints, or non-2xx
+  # Results from Post/Patch. Exceptions raised by your hook are ignored, and the
+  # original error is raised unchanged. The gem never logs on its own.
   config.on_error = ->(error, context:) { MyApp::Logger.warn(error.message, context) }
 
   # A Hash or a YAML file path — see "Schema" below. Defaults to nil (empty).
