@@ -247,6 +247,9 @@ What still raises, before any request is sent or when something is actually brok
 ```ruby
 validate :presence, %i[id name], on: :create
 
+validate :presence, %i[key], on: :update
+validate :kind_of, :string, %i[key], on: :update
+
 validate :presence, %i[key], on: :delete
 validate :kind_of, :string, %i[key], on: :delete
 
