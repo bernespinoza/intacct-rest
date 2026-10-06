@@ -32,7 +32,7 @@ module IntacctRest
       response = authenticated_response(:delete, path)
       parsed = parse_json(response.body, path)
       result = build_result(model, response, parsed)
-      model.apply_result(result) if result.success?
+      model.apply_result(result) unless result.success?
       result
     end
 

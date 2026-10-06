@@ -4,7 +4,7 @@ class TestEndpointsDeleteBill < Minitest::Test
   def setup
     IntacctRest.reset
     IntacctRestTestConfig.apply
-    @bill = IntacctRest::Model::Bill.new(key: '111', credit_limit: 10_000)
+    @bill = IntacctRest::Model::Bill.new(key: '111', id: 'B-00014', credit_limit: 10_000)
     @bill_url = "#{IntacctRest.configuration.base_url}#{@bill.intacct_object}/111"
   end
 
@@ -22,14 +22,15 @@ class TestEndpointsDeleteBill < Minitest::Test
 
   def test_call_returns_success_result_with_default_result_fields
     stub_token_request
-    stub_request(:bill, @bill_url)
-      .to_return(status: 200, body: '')
+    stub_request(:delete, @bill_url)
+      .to_return(status: 200, body: ''.to_json)
 
-    result = IntacctRest::Endpoints::UpdateBill.call(bill: @bill)
+    result = IntacctRest::Endpoints::DeleteBill.call(bill: @bill)
 
     assert result.success?
     assert_same @bill, result.model
     assert_equal 'B-00014', @bill.id
+    assert_equal '111', @bill.key
   end
 
   private

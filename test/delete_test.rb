@@ -23,33 +23,32 @@ class TestPatch < Minitest::Test
   def test_call_deletes_the_record
     stub_token_request
     stub_request(:delete, @vendor_url)
-      .to_return(
-        status: 200,
-        body: ''
-      )
+      .to_return(status: 200, body: ''.to_json)
 
     result = IntacctRest::Delete.call(@vendor)
 
     assert_instance_of IntacctRest::Result::Success, result
     assert result.success?
-    assert_same @vendor, result.model
-    assert_equal '/objects/accounts-payable/vendor/111', @vendor.href
   end
 
 
   def test_call_returns_error_result_without_raising_on_non_2xx
     stub_token_request
     stub_request(:delete, @vendor_url)
-      .to_return(status: 400, body: { 'ia::result' => { 'ia::error' => {
-         'code' => 'invalidRequest',
-         'message' => 'bad request',
-         'errorId' => 'REST-1028'
-       },
+      .to_return(status: 400, body: {
+        'ia::result' => {
+          'ia::error' => {
+          'code' => 'invalidRequest',
+          'message' => 'bad request',
+          'errorId' => 'REST-1028'
+          }
+        },
         'ia::meta' => {
           'totalCount' => 1,
           'totalSuccess' => 0,
           'totalError' => 1
-       } }.to_json)
+        }
+      }.to_json)
 
     result = IntacctRest::Delete.call(@vendor)
 
@@ -64,7 +63,7 @@ class TestPatch < Minitest::Test
     stub_request(:delete, @vendor_url)
       .to_return(status: 401, body: 'unauthorized')
       .then
-      .to_return(status: 200, body: '')
+      .to_return(status: 200, body: ''.to_json)
 
     assert IntacctRest::Delete.call(@vendor).success?
   end

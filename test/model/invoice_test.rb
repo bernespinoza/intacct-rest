@@ -31,37 +31,37 @@ class TestModelInvoice < Minitest::Test
   end
 
   def test_valid_with_invoice_date_and_due_date
-    assert IntacctRest::Model::Invoice.new(invoice_date: '2022-12-06', due_date: '2022-12-31').valid?
+    assert IntacctRest::Model::Invoice.new(invoice_date: '2022-12-06', due_date: '2022-12-31').valid?(:create)
   end
 
   def test_invalid_without_invoice_date
     invoice = IntacctRest::Model::Invoice.new(due_date: '2022-12-31')
 
-    refute invoice.valid?
-    assert_includes invoice.errors, 'invoice_date is required'
+    refute invoice.valid?(:create)
+    assert_includes invoice.errors(:create), 'invoice_date is required'
   end
 
   def test_invalid_without_due_date
     invoice = IntacctRest::Model::Invoice.new(invoice_date: '2022-12-06')
 
-    refute invoice.valid?
-    assert_includes invoice.errors, 'due_date is required'
+    refute invoice.valid?(:create)
+    assert_includes invoice.errors(:create), 'due_date is required'
   end
 
   def test_invalid_with_wrong_kind_of_attribute
     invoice = IntacctRest::Model::Invoice.new(invoice_date: '2022-12-06', due_date: '2022-12-31',
                                                customer: 'not-a-hash')
 
-    refute invoice.valid?
-    assert_includes invoice.errors, 'customer must be a hash'
+    refute invoice.valid?(:create)
+    assert_includes invoice.errors(:create), 'customer must be a hash'
   end
 
   def test_invalid_with_lines_not_an_array
     invoice = IntacctRest::Model::Invoice.new(invoice_date: '2022-12-06', due_date: '2022-12-31',
                                                lines: 'not-an-array')
 
-    refute invoice.valid?
-    assert_includes invoice.errors, 'lines must be a array'
+    refute invoice.valid?(:create)
+    assert_includes invoice.errors(:create), 'lines must be a array'
   end
 
   def test_payload_uses_camel_case_json_keys_and_passes_customer_reference_through
@@ -112,8 +112,8 @@ class TestModelInvoice < Minitest::Test
 
     invoice = strict_invoice_class.new(due_date: '2022-12-31')
 
-    refute invoice.valid?
-    assert_includes invoice.errors, 'invoice_date is required'
-    assert_includes invoice.errors, 'invoice_number is required'
+    refute invoice.valid?(:create)
+    assert_includes invoice.errors(:create), 'invoice_date is required'
+    assert_includes invoice.errors(:create), 'invoice_number is required'
   end
 end

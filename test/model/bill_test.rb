@@ -37,29 +37,29 @@ class TestModelBill < Minitest::Test
   def test_invalid_without_due_date
     bill = IntacctRest::Model::Bill.new(created_date: '2024-02-21')
 
-    refute bill.valid?
-    assert_includes bill.errors, 'due_date is required'
+    refute bill.valid?(:create)
+    assert_includes bill.errors(:create), 'due_date is required'
   end
 
   def test_invalid_without_created_date
     bill = IntacctRest::Model::Bill.new(due_date: '2024-03-08')
 
-    refute bill.valid?
-    assert_includes bill.errors, 'created_date is required'
+    refute bill.valid?(:create)
+    assert_includes bill.errors(:create), 'created_date is required'
   end
 
   def test_invalid_with_wrong_kind_of_attribute
     bill = IntacctRest::Model::Bill.new(due_date: '2024-03-08', created_date: '2024-02-21', vendor: 'not-a-hash')
 
     refute bill.valid?
-    assert_includes bill.errors, 'vendor must be a hash'
+    assert_includes bill.errors(:create), 'vendor must be a hash'
   end
 
   def test_invalid_with_lines_not_an_array
     bill = IntacctRest::Model::Bill.new(due_date: '2024-03-08', created_date: '2024-02-21', lines: 'not-an-array')
 
     refute bill.valid?
-    assert_includes bill.errors, 'lines must be a array'
+    assert_includes bill.errors(:create), 'lines must be a array'
   end
 
   def test_payload_uses_camel_case_json_keys_and_passes_vendor_reference_through
@@ -112,8 +112,8 @@ class TestModelBill < Minitest::Test
 
     bill = strict_bill_class.new(due_date: '2024-03-08')
 
-    refute bill.valid?
-    assert_includes bill.errors, 'created_date is required'
-    assert_includes bill.errors, 'bill_number is required'
+    refute bill.valid?(:create)
+    assert_includes bill.errors(:create), 'created_date is required'
+    assert_includes bill.errors(:create), 'bill_number is required'
   end
 end
