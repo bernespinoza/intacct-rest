@@ -14,7 +14,8 @@ A small, framework-agnostic Ruby client for [Sage Intacct's REST API v1](https:/
 - **`IntacctRest::Model::Contact`**, a data + validation object for the non-deprecated subset of the contact shape shared by vendors and customers (no dedicated create endpoint — contacts are referenced by id from `contacts`/`contact_list`; this is just a typed helper for building that nested payload)
 - **The `POST /objects/accounts-payable/bill` endpoint**, via `IntacctRest::Endpoints::CreateBill` and `IntacctRest::Model::Bill`, reusing the same `Post`/validation pattern
 - **The `POST /objects/accounts-payable/bill-line` endpoint**, via `IntacctRest::Endpoints::CreateBillLine` and `IntacctRest::Model::BillLine`
-
+- **The `DELETE /objects/accounts-payable/bill/{key}` endpoint**, via `IntacctRest::Endpoints::DeleteBill` and `IntacctRest::Delete` (the generic "delete this model" operation), sending only the model key
+- **The `DELETE /objects/accounts-receivable/invoice/{key}` endpoint**, via `IntacctRest::Endpoints::DeleteInvoice` and `IntacctRest::Delete` (the generic "delete this model" operation), sending only the model key
 It has no Rails, ActiveRecord, or Redis dependency — the host application supplies its own token store and error-handling hook.
 
 ## Installation
@@ -245,14 +246,18 @@ What still raises, before any request is sent or when something is actually brok
 
 ```ruby
 validate :presence, %i[id name], on: :create
+
 validate :presence, %i[key], on: :update
 validate :kind_of, :string, %i[key], on: :update
+
+validate :presence, %i[key], on: :delete
+validate :kind_of, :string, %i[key], on: :delete
 
 validate :kind_of, :string, %i[id name status state ...]
 validate :inclusion, BANK_FILE_COUNTRY_CODES, %i[bank_files_payment_country_code]
 ```
 
-`on:` scopes a validation to one operation: it only runs when `#errors`/`#valid?` is called with that context. A validation without `on:` always runs. `Post` validates with `:create` and `Patch` with `:update`, so a vendor needs `id`/`name` to be created and `key` to be updated (see Updating a vendor, below).
+`on:` scopes a validation to one operation: it only runs when `#errors`/`#valid?` is called with that context. A validation without `on:` always runs. `Post` validates with `:create`, `Patch` with `:update` and `Delete` with `:delete`. Therefore a vendor needs `id`/`name` to be created and `key` to be updated (see Updating a vendor, below) and a bill or invoices to be deleted needs `key`.
 
 Four validator kinds ship in `IntacctRest::Validators`:
 
@@ -261,7 +266,7 @@ Four validator kinds ship in `IntacctRest::Validators`:
 - `:inclusion` — the attribute, if present, must be included in a given list (e.g. Intacct's documented bank-file country codes)
 - `:custom` — the attribute, if present, is passed to an instance method you name (`record.send(method_name, value)`); a falsy return means invalid
 
-By default, `Post` validates the model first, raising `IntacctRest::ValidationError` and skipping the HTTP request entirely if it's invalid — currently that means `id`/`name` presence, every field's documented type, and `bank_files["paymentCountryCode"]` (if set) matching a real country code. `Patch` does the same with `key` in place of `id`/`name`. Note Intacct can auto-generate `id` when document sequencing is enabled for your company; override `errors` in a `Model::Vendor` subclass if you need to relax that.
+By default, `Post` validates the model first, raising `IntacctRest::ValidationError` and skipping the HTTP request entirely if it's invalid — currently that means `id`/`name` presence, every field's documented type, and `bank_files["paymentCountryCode"]` (if set) matching a real country code. `Patch` and `Delete` does the same with `key` in place of `id`/`name`. Note Intacct can auto-generate `id` when document sequencing is enabled for your company; override `errors` in a `Model::Vendor` subclass if you need to relax that.
 
 ### Custom fields
 
@@ -324,6 +329,52 @@ vendor.id       # => "V-00014"   (filled in from the response by Patch, via mode
 - `#update_payload` — the outgoing JSON, only the fields to change
 - `#errors(:update)` — validated first; any error raises `IntacctRest::ValidationError` and no request is sent
 - `#apply_result` — called with the Result on success
+
+Like `Post`, it never raises for the HTTP outcome and always returns an `IntacctRest::Result` (see The Result, above).
+
+## Deleting a payment
+
+`IntacctRest::Endpoints::DeletePayment` sends `PATCH /objects/accounts-payable/bill/{key}`. Set `key` to pick the record, plus only the fields you want to change:
+
+```ruby
+bill = IntacctRest::Model::Bill.new(key: "111")
+
+result = IntacctRest::Endpoints::DeleteBill.call(bill: bill)
+
+result.success? # => true
+bill.id       # => "00014" (model contains the same data before it was sent)
+bill.key      # => "111"
+```
+
+- `key` is required on delete and must be a String.
+- `results:` a successful response is a non content http response with 200 status
+
+
+## Deleting a invoice
+
+`IntacctRest::Endpoints::DeleteInvoice` sends `PATCH /objects/accounts-receivable/invoice/{key}`. Set `key` to pick the record, plus only the fields you want to change:
+
+```ruby
+invoice = IntacctRest::Model::Invoice.new(key: "111")
+
+result = IntacctRest::Endpoints::DeleteInvoice.call(invoice: invoice)
+
+result.success? # => true
+invoice.id       # => "00014" (model contains the same data before it was sent)
+invoice.key      # => "111"
+```
+
+- `key` is required on delete and must be a String.
+- `results:` a successful response is a non content http response with 200 status
+
+## IntacctRest::Delete
+
+`IntacctRest::Delete` is the generic "delete this model" operation behind `DeleteBill` and `DeleteInvoice`, the DELETE counterpart of `Post`. It works against any model that responds to:
+
+- `#intacct_object` — the collection path; `Delete` appends `/#{model.key}`
+- `#key` — the record to delete
+- `#errors(:delete)` — validated first the key that any model should required presense of; any error raises `IntacctRest::ValidationError` and no request is sent
+- `#apply_result` — called with the Result on success but this is always empty model preserves its data
 
 Like `Post`, it never raises for the HTTP outcome and always returns an `IntacctRest::Result` (see The Result, above).
 

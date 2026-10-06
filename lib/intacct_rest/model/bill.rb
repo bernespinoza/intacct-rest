@@ -38,18 +38,21 @@ module IntacctRest
       attr_accessor(*READONLY_ATTRIBUTES)
       attr_reader :custom_fields
 
-      validate :presence, %i[due_date created_date]
+      validate :presence, %i[due_date created_date], on: :create
 
       validate :kind_of, :string, %i[
         bill_number state reference_number description posting_date discount_cut_off_date
         due_date recommended_payment_date created_date invoice_type invoice_mode
-      ]
-      validate :kind_of, :boolean, %i[is_on_hold is_tax_inclusive]
+      ], on: :create
+      validate :kind_of, :boolean, %i[is_on_hold is_tax_inclusive], on: :create
       validate :kind_of, :hash, %i[
         vendor term contacts currency tax_solution bill_summary bill_back_template attachment
         dispute refuse
       ]
       validate :kind_of, :array, %i[lines]
+
+      validate :presence, %i[key], on: :delete
+      validate :kind_of, :string, %i[key], on: :delete
 
       # source: an arbitrary domain object (ActiveRecord record, OpenStruct,
       # another Model::Bill, ...) to pull matching attributes off of via

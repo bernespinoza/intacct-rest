@@ -40,8 +40,10 @@ module IntacctRest
       attr_accessor(*READONLY_ATTRIBUTES)
       attr_reader :custom_fields
 
-      validate :presence, %i[invoice_date due_date]
+      validate :presence, %i[invoice_date due_date], on: :create
+      validate :presence, %i[key], on: :delete
 
+      validate :kind_of, :string, %i[key], on: :delete
       validate :kind_of, :string, %i[
         invoice_number state reference_number description invoice_date due_date
         invoice_type invoice_mode
@@ -51,6 +53,8 @@ module IntacctRest
         tax_solution invoice_summary
       ]
       validate :kind_of, :array, %i[lines]
+
+
 
       # source: an arbitrary domain object (ActiveRecord record, OpenStruct,
       # another Model::Invoice, ...) to pull matching attributes off of via
