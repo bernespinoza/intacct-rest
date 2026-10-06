@@ -52,6 +52,9 @@ module IntacctRest
       ]
       validate :kind_of, :array, %i[lines]
 
+      validate :presence, %i[key], on: :delete
+      validate :kind_of, :string, %i[key], on: :delete
+
       # source: an arbitrary domain object (ActiveRecord record, OpenStruct,
       # another Model::Invoice, ...) to pull matching attributes off of via
       # duck-typing — any WRITABLE_ATTRIBUTES/READONLY_ATTRIBUTES key it
