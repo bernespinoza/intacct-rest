@@ -23,7 +23,7 @@ class TestPatch < Minitest::Test
   def test_call_deletes_the_record
     stub_token_request
     stub_request(:delete, @vendor_url)
-      .to_return(status: 200, body: ''.to_json)
+      .to_return(status: 200)
 
     result = IntacctRest::Delete.call(@vendor)
 
@@ -63,7 +63,7 @@ class TestPatch < Minitest::Test
     stub_request(:delete, @vendor_url)
       .to_return(status: 401, body: 'unauthorized')
       .then
-      .to_return(status: 200, body: ''.to_json)
+      .to_return(status: 200)
 
     assert IntacctRest::Delete.call(@vendor).success?
   end
