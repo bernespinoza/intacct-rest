@@ -66,6 +66,8 @@ module IntacctRest
     end
 
     def parse_json(body, path)
+      return {} if body.nil? || body.empty?
+
       JSON.parse(body)
     rescue JSON::ParserError => e
       raise_reported IntacctRest::ResponseParseError.new("#{e.message} (#{path})", raw_body: body),
